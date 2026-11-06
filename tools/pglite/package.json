@@ -1,0 +1,13 @@
+{
+  "name": "olt-monitor-pglite",
+  "private": true,
+  "type": "module",
+  "description": "Runs a real PostgreSQL (WASM) for the Go integration tests without a server.",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.15",
+    "@electric-sql/pglite-socket": "^0.2.18"
+  }
+}

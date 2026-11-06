@@ -76,32 +76,32 @@ Errors are `{"error":{"code":"not_found","message":"..."}}`. A missing row is
   `(vendor, technology)`. Low-optical counts join against it, so an uncalibrated
   pair contributes nothing instead of a guess.
 
-## Verification status — read this before trusting the SQL
+## Verification status
 
-The sandbox this was written in **cannot run PostgreSQL**: Android's seccomp
-filter denies `shmget` (*Function not implemented*) and there is no `/dev/shm`
-for POSIX shared memory (`shm_open` → ENOENT). The server binaries install, but
-`initdb` cannot bootstrap a cluster.
+The development sandbox cannot start a native PostgreSQL (seccomp denies
+`shmget`; there is no `/dev/shm`, so `shm_open` returns ENOENT). That is an
+environment limit, not a code limit — and it is worked around rather than
+ignored: **PGlite runs the real PostgreSQL core compiled to WebAssembly**, and
+the integration suite runs against it.
 
-What that means for this code:
+```bash
+./scripts/pglite-test.sh        # or: make test-pglite
+```
 
 | Check | Status |
 |---|---|
 | `go build ./...`, `go vet ./...` | passing |
 | Handler tests against the in-memory store | passing |
-| Every runtime query parsed with a PostgreSQL grammar | passing (`TestQueriesParse`) |
-| Migration SQL executed | **never — needs a real database** |
-| Queries executed, column names verified | **never — needs a real database** |
+| Migration executed by PostgreSQL | **yes — PostgreSQL 18.6 (PGlite)** |
+| Every query executed, columns verified | **yes** |
+| Seed, counts, thresholds, duplicates, null gaps | **yes** |
+| Against a native server (roles, extensions, TCP auth) | **not yet — run it once on your host** |
 
-`TestQueriesParse` proves grammar, not semantics: a wrong column name parses and
-fails at runtime. Run the integration suite once against a real database before
-believing any of it:
-
-```bash
-TEST_DATABASE_URL=... go test ./internal/store/postgres/ -v
-```
-
-Those tests are skipped, not faked, when the variable is absent.
+What PGlite does not prove: a native server's authentication, roles,
+extensions, or concurrency behaviour. `pglite-socket` multiplexes one backend,
+so the DSN sets `default_query_exec_mode=simple_protocol` — pgx's prepared
+statement cache collides with the shared backend. A real server needs no such
+flag.
 
 ## Layout
 

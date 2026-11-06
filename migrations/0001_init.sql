@@ -8,7 +8,9 @@
 --   3. Thresholds live in the database, per vendor/technology, because one
 --      universal RX threshold is wrong for at least one of your devices.
 
-BEGIN;
+-- No BEGIN/COMMIT here: internal/store/postgres/migrate.go wraps each file in a
+-- transaction. A second COMMIT inside the file would end that transaction early
+-- and leave the schema_migrations insert running in autocommit.
 
 CREATE TYPE onu_status AS ENUM ('online', 'offline', 'unknown');
 CREATE TYPE collection_status AS ENUM ('successful', 'partial', 'failed', 'stale', 'unsupported');
@@ -189,4 +191,3 @@ CREATE TABLE audit_log (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-COMMIT;
