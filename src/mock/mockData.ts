@@ -211,6 +211,27 @@ for (const seed of OLT_SEEDS) {
             : EVENT_LABELS[Math.floor(rng() * EVENT_LABELS.length)],
         deregistrations24h:
           status === "offline" ? 1 + Math.floor(rng() * 3) : 0,
+        lastOnlineAt: {
+          deviceTime: null,
+          ingestedAt: minutesAgo(
+            status === "online" ? 1 + Math.floor(rng() * 30) : 45 + Math.floor(rng() * 300),
+          ),
+          quality: "trusted",
+        },
+        lastRegistrationAt: {
+          // OLT-01's clock is wrong, so its syslog-derived times cannot be trusted.
+          deviceTime: seed.id === "olt-1" ? "2000-05-20T04:12:33.000Z" : null,
+          ingestedAt: minutesAgo(1_440 * 30 + Math.floor(rng() * 1_000)),
+          quality: seed.id === "olt-1" ? "untrusted" : "trusted",
+        },
+        lastDeregistrationAt:
+          status === "online"
+            ? null
+            : {
+                deviceTime: seed.id === "olt-1" ? "2000-05-20T04:12:33.000Z" : null,
+                ingestedAt: minutesAgo(5 + Math.floor(rng() * 60)),
+                quality: seed.id === "olt-1" ? "untrusted" : "trusted",
+              },
         collectionStatus: status === "unknown" ? "failed" : "successful",
       });
     });

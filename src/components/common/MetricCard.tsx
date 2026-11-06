@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 export type MetricTone =
   | "neutral"
@@ -11,7 +11,8 @@ export type MetricTone =
 
 interface MetricCardProps {
   label: string;
-  value: number | string;
+  /** Text, a number, or a badge — the card only controls the typography. */
+  value: ReactNode;
   hint?: string;
   tone?: MetricTone;
 }

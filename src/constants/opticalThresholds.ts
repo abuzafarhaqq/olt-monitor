@@ -68,3 +68,14 @@ export function classifyRx(
   if (rxPowerDbm <= threshold.warningDbm) return "warning";
   return "ok";
 }
+
+/**
+ * Non-throwing lookup for UI that must render *something* when a vendor/model
+ * pair has no calibrated threshold. null = "no verdict available".
+ */
+export function findThreshold(
+  vendor: Vendor,
+  technology: Technology,
+): OpticalThreshold | null {
+  return THRESHOLDS[`${vendor}/${technology}`] ?? null;
+}

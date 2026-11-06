@@ -174,6 +174,10 @@ export interface Onu {
   /** false = the adapter has no optical command for this model. */
   opticalSupported: boolean;
   lastEvent: string | null;
+  /** Last time the device reported this ONU online. */
+  lastOnlineAt: DeviceTimestamps | null;
+  lastRegistrationAt: DeviceTimestamps | null;
+  lastDeregistrationAt: DeviceTimestamps | null;
   /** Deregistrations in the last 24h — the evidence behind "flapping". */
   deregistrations24h: number;
   collectionStatus: CollectionStatus;
@@ -241,4 +245,54 @@ export interface OverviewResponse {
   events: NetworkEvent[];
   incidents: Incident[];
   availabilityTrend: AvailabilityPoint[];
+}
+
+/* -------------------------------------------------------------------------
+ * ONU diagnostics (§5.4) and optical diagnostics (§5.6)
+ * ---------------------------------------------------------------------- */
+
+/**
+ * One reading. `supported: false` means the adapter has no command for this
+ * metric on this model — different from "the command ran and returned nothing",
+ * which is `value: null`.
+ */
+export interface Measurement {
+  value: number | null;
+  supported: boolean;
+}
+
+export interface OnuOpticalMeasurements {
+  rxPowerDbm: Measurement;
+  txPowerDbm: Measurement;
+  temperatureC: Measurement;
+  supplyVoltageV: Measurement;
+  txBiasCurrentMa: Measurement;
+  /** Device-reported distance, in metres. */
+  distanceMeters: Measurement;
+  /** Platform time of the measurement, not the device clock. */
+  measuredAt: string | null;
+  collectionStatus: CollectionStatus;
+}
+
+export interface OpticalHistoryPoint {
+  at: string;
+  /** null = no sample for that bucket. Never interpolated. */
+  rxPowerDbm: number | null;
+}
+
+export interface RawEvidence {
+  id: string;
+  command: string;
+  capturedAt: string;
+  parserVersion: string;
+  /** 0..1 — share of expected rows the parser accounted for. */
+  completeness: number;
+  text: string;
+}
+
+export interface OnuDiagnostics {
+  onuId: string;
+  measurements: OnuOpticalMeasurements;
+  history: OpticalHistoryPoint[];
+  evidence: RawEvidence[];
 }

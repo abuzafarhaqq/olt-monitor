@@ -2,8 +2,9 @@
 
 React 18 + TypeScript 5.6 + Vite 6. Application shell, routing, design tokens,
 reusable components, a mock-data Network Overview, Collection Health, OLT
-Inventory (with device detail) and PON Explorer. No backend, no OLT connection,
-no authentication yet.
+Inventory (with device detail), PON Explorer, ONU Management with per-ONU
+diagnostics, and Optical Diagnostics. No backend, no OLT connection, no
+authentication yet.
 
 ## Run it
 
@@ -43,7 +44,8 @@ src/
                   selectors.ts (all derived numbers live here)
     olts/         OltInventoryPage, OltDetailPage, AddOltDrawer, selectors.ts
     pons/         PonExplorerPage + selectors.ts (tree, ONU filters, PON metrics)
-    onus/         OnuTable, shared by PON Explorer and OLT detail
+    onus/         OnuListPage, OnuDetailPage, OnuTable, selectors.ts
+    optical/      OpticalDiagnosticsPage + selectors.ts (RX distribution, per-PON health)
     collection/   CollectionHealthPage + selectors.ts (job filters, KPIs)
     placeholder/  PlaceholderPage for routes not built yet
   mock/           mockData.ts
@@ -76,6 +78,11 @@ nested it inside `components/`, which contradicts §12.
 - **No universal optical threshold.** `classifyRx` resolves the table by
   `${vendor}/${technology}`; an ONU with no configured pair shows `No threshold`
   in grey, never `OK`.
+- **Every measurement is `{ value, supported }`.** `supported: false` means the
+  adapter has no command for that metric on that model; `value: null` means the
+  command ran and returned nothing. Only supported metrics get a card.
+- **Raw evidence is reproducible.** Command, capture time, parser version and
+  completeness travel with the text; a 50 % parse shows a warning.
 - **A password has no input field.** The Add-OLT form takes a *credential
   reference*; validation rejects an empty one and the form states that nothing
   is saved until the write API exists.
@@ -97,5 +104,5 @@ nested it inside `components/`, which contradicts §12.
 
 Auth and roles, global search, REST client, SSE, incident workflow, the
 Diagnostics Console, CSV/JSON export, OLT detail tabs for performance /
-collection history / configuration / raw evidence, and every page still marked
-`S<n>` in the sidebar.
+collection history / configuration, and every page still marked `S<n>` in the
+sidebar.

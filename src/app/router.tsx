@@ -5,11 +5,14 @@ import { CollectionHealthPage } from "../features/collection/CollectionHealthPag
 import { OverviewPage } from "../features/dashboard/OverviewPage";
 import { OltDetailPage } from "../features/olts/OltDetailPage";
 import { OltInventoryPage } from "../features/olts/OltInventoryPage";
+import { OpticalDiagnosticsPage } from "../features/optical/OpticalDiagnosticsPage";
 import { PlaceholderPage } from "../features/placeholder/PlaceholderPage";
 import { PonExplorerPage } from "../features/pons/PonExplorerPage";
+import { OnuDetailPage } from "../features/onus/OnuDetailPage";
+import { OnuListPage } from "../features/onus/OnuListPage";
 
 /** Nav paths that already render a real page. */
-const BUILT_PATHS = new Set(["/", "/olts", "/pons", "/collection"]);
+const BUILT_PATHS = new Set(["/", "/olts", "/pons", "/onus", "/optical", "/collection"]);
 
 /**
  * Declarative routing: routes are JSX, and every remaining route is generated
@@ -26,6 +29,9 @@ export function AppRouter() {
           <Route path="/olts" element={<OltInventoryPage />} />
           <Route path="/olts/:oltId" element={<OltDetailPage />} />
           <Route path="/pons" element={<PonExplorerPage />} />
+          <Route path="/onus" element={<OnuListPage />} />
+          <Route path="/onus/:onuId" element={<OnuDetailPage />} />
+          <Route path="/optical" element={<OpticalDiagnosticsPage />} />
           <Route path="/collection" element={<CollectionHealthPage />} />
           {placeholderRoutes.map((item) => (
             <Route
