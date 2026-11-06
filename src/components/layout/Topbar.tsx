@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../app/AuthContext";
 import { useLiveEvents } from "../../hooks/useLiveEvents";
 import { MOCK_OVERVIEW } from "../../mock/mockData";
@@ -10,7 +11,8 @@ interface TopbarProps {
 }
 
 export function Topbar({ navOpen, onToggleNav }: TopbarProps) {
-  const { user, setRole } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const liveEvents = useLiveEvents(5);
   const lastEvent = liveEvents[0];
 
@@ -55,20 +57,20 @@ export function Topbar({ navOpen, onToggleNav }: TopbarProps) {
           snapshot {formatRelative(MOCK_OVERVIEW.generatedAt)}
         </span>
 
-        <label className="topbar__role">
-          <span className="visually-hidden">Role</span>
-          <select
-            className="filter-field__control topbar__role-select"
-            value={user.role}
-            onChange={(event) => setRole(event.target.value as typeof user.role)}
-          >
-            {ROLES.map((role) => (
-              <option key={role.id} value={role.id}>
-                {role.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <span className="topbar__user">{user?.fullName ?? "—"}</span>
+        <span className="badge badge--investigating topbar__role-badge">
+          {ROLES.find((role) => role.id === user?.role)?.label ?? user?.role ?? "anonymous"}
+        </span>
+        <button
+          type="button"
+          className="btn btn--small"
+          onClick={async () => {
+            await logout();
+            navigate("/login", { replace: true });
+          }}
+        >
+          Sign out
+        </button>
       </div>
     </header>
   );

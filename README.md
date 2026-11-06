@@ -72,6 +72,22 @@ src/
 `src/features/` is a sibling of `src/components/` — the spec's ASCII tree in §9
 nested it inside `components/`, which contradicts §12.
 
+## Signing in
+
+`/login` and `/forgot-password` sit outside the app shell; every other route is
+wrapped in `RequireAuth` and redirects to `/login` while remembering where you
+were headed.
+
+`USE_MOCK_API = true` (the default) uses **mock sign-in**: `admin`, `engineer`,
+`operator` or `viewer`, password `demo`. The UI labels it as mock on the form.
+Set `USE_MOCK_API = false` in `services/client.ts` to talk to the Go API instead
+(`POST /api/v1/auth/login`, `GET /auth/me`, `POST /auth/logout`), with the
+session in an HttpOnly cookie.
+
+The top bar shows the signed-in user, their role and a sign-out button; the role
+switcher is gone. Permissions come from the session, and no session means no
+permissions — `can()` returns false when there is no user.
+
 ## Rules this stage already enforces
 
 - **Operational state ≠ collection state.** `OnuStatus` (online / offline /

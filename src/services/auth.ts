@@ -89,18 +89,5 @@ export function can(role: Role, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role].includes(permission);
 }
 
-export interface CurrentUser {
-  id: string;
-  name: string;
-  role: Role;
-}
-
-/**
- * Stand-in until the login endpoint exists. The role switcher in the top bar
- * exists so permissions can be exercised; it is not a security boundary.
- */
-export const MOCK_USER: CurrentUser = {
-  id: "user-1",
-  name: "NOC Operator",
-  role: "noc-operator",
-};
+// The signed-in user now comes from the session (services/authApi.ts). This
+// module only describes the policy: which role may do what.

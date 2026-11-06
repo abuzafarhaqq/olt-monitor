@@ -33,12 +33,12 @@ export function UsersAccessPage() {
         <div className="card__body">
           <div className="drawer-section__row">
             <span className="badge badge--info">signed in as</span>
-            <strong>{user.name}</strong>
+            <strong>{user?.fullName ?? "not signed in"}</strong>
             <span className="badge badge--investigating">
-              {ROLES.find((role) => role.id === user.role)?.label}
+              {ROLES.find((role) => role.id === user?.role)?.label ?? "—"}
             </span>
             <span className="cell-sub">
-              Switch the role in the top bar to see what each permission hides.
+              Sign in as a different account to see what each role hides.
             </span>
           </div>
         </div>
