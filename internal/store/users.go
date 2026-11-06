@@ -30,3 +30,9 @@ type AuthStore interface {
 	RevokeSession(ctx context.Context, tokenHash []byte) error
 	TouchLogin(ctx context.Context, userID string) error
 }
+
+// AuditStore records who did what. Separate from Store so a read-only fixture
+// does not have to pretend to keep an audit trail.
+type AuditStore interface {
+	RecordAudit(ctx context.Context, actor, action, target, detail string) error
+}

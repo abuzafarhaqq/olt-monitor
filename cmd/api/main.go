@@ -48,7 +48,7 @@ func main() {
 		}
 		defer pg.Close()
 		logger.Info("connected to postgres")
-		handler = api.NewServer(pg, logger).WithAuth(pg).Routes()
+		handler = api.NewServer(pg, logger).WithAuth(pg).WithAudit(pg).Routes()
 	}
 
 	server := &http.Server{

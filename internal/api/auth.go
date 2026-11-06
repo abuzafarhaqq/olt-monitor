@@ -27,6 +27,13 @@ func (s *Server) WithAuth(authStore store.AuthStore) *Server {
 	return s
 }
 
+// WithAudit enables audit recording. Without it, actions still work but leave
+// no trail — acceptable in tests, not in production.
+func (s *Server) WithAudit(audit store.AuditStore) *Server {
+	s.audit = audit
+	return s
+}
+
 type loginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -173,6 +180,30 @@ func (s *Server) requireSession(next http.HandlerFunc) http.HandlerFunc {
 
 		next(w, r.WithContext(context.WithValue(r.Context(), userCtxKey, user)))
 	}
+}
+
+// passwordResetRequest records the intent and answers identically whether or
+// not the address exists. There is no mailer yet, so the request lands in the
+// audit log where an administrator can act on it with `userctl passwd`.
+//
+// It never says "no such account": that would turn this endpoint into an
+// account-enumeration oracle.
+func (s *Server) passwordResetRequest(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_body", "expected {email}")
+		return
+	}
+
+	if body.Email != "" && s.audit != nil {
+		if err := s.audit.RecordAudit(r.Context(), "anonymous", "password_reset_request", body.Email, ""); err != nil {
+			s.log.Warn("audit reset request", "error", err)
+		}
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func userFrom(ctx context.Context) (store.User, bool) {

@@ -18,6 +18,7 @@ import (
 type Server struct {
 	store     store.Store
 	auth      store.AuthStore
+	audit     store.AuditStore
 	log       *slog.Logger
 	heartbeat time.Duration
 }
@@ -55,6 +56,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/auth/login", s.login)
 	mux.HandleFunc("POST /api/v1/auth/logout", s.logout)
 	mux.HandleFunc("GET /api/v1/auth/me", s.requireSession(s.me))
+	mux.HandleFunc("POST /api/v1/auth/password-reset", s.passwordResetRequest)
 
 	return s.recoverer(s.logger(mux))
 }

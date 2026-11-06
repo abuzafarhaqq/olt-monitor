@@ -40,7 +40,7 @@ func newAuthServer(t *testing.T) (http.Handler, *postgres.Store, string) {
 		t.Fatalf("create user: %v", err)
 	}
 
-	return api.NewServer(st, nil).WithAuth(st).Routes(), st, username
+	return api.NewServer(st, nil).WithAuth(st).WithAudit(st).Routes(), st, username
 }
 
 func postJSON(t *testing.T, handler http.Handler, path string, body any) *httptest.ResponseRecorder {

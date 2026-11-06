@@ -83,6 +83,7 @@ DATABASE_URL=... userctl list
 POST /api/v1/auth/login   {username, password}  → 200 + session cookie
 GET  /api/v1/auth/me                            → 401 without a session
 POST /api/v1/auth/logout                        → 204, row revoked
+POST /api/v1/auth/password-reset {email}        → 204 always, audit row only
 ```
 
 An unknown username, a wrong password and a disabled account all answer the
