@@ -850,3 +850,45 @@
   resize: vertical;
   font-family: var(--font-sans);
 }
+
+/* Report presets and checkbox ------------------------------------------ */
+
+.preset-group {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.preset {
+  padding: 0 var(--space-3);
+  height: 26px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.preset--active {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-card);
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.checkbox input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-info);
+}

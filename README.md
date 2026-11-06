@@ -3,8 +3,8 @@
 React 18 + TypeScript 5.6 + Vite 6. Application shell, routing, design tokens,
 reusable components, a mock-data Network Overview, Collection Health, OLT
 Inventory (with device detail), PON Explorer, ONU Management with per-ONU
-diagnostics, Optical Diagnostics, and Incidents & Events. No backend, no OLT
-connection, no authentication yet.
+diagnostics, Optical Diagnostics, Incidents & Events, and History & Reports
+with CSV/JSON export. No backend, no OLT connection, no authentication yet.
 
 ## Run it
 
@@ -47,12 +47,15 @@ src/
     onus/         OnuListPage, OnuDetailPage, OnuTable, selectors.ts
     optical/      OpticalDiagnosticsPage + selectors.ts (RX distribution, per-PON health)
     incidents/    IncidentsPage, IncidentDrawer, selectors.ts
+    reports/      ReportsPage + selectors.ts (range, comparison, rows)
     collection/   CollectionHealthPage + selectors.ts (job filters, KPIs)
     placeholder/  PlaceholderPage for routes not built yet
   mock/           mockData.ts
   styles/         tokens.css, global.css, layout.css, components.css, dashboard.css
   types/          domain.ts
-  utils/          format.ts
+  constants/      ... reports.ts (report registry)
+  mock/           mockData.ts, collectionHealth.ts, onuDiagnostics.ts, history.ts
+  utils/          format.ts, export.ts (CSV/JSON)
 ```
 
 `src/features/` is a sibling of `src/components/` — the spec's ASCII tree in §9
@@ -93,6 +96,12 @@ nested it inside `components/`, which contradicts §12.
   purple callout prefixed "not a confirmed root cause", never as a verdict.
 - **Incident changes are session-local** and the page says so whenever one is
   made; nothing is written anywhere until the write API exists.
+- **Period comparison is equal-length.** The previous window is computed from
+  the selected range, so 7 days is never compared with 30.
+- **CSV is quoted per RFC 4180** and JSON is exported from the same row objects,
+  so the two files can never disagree.
+- **ISO dates compare as strings.** Range filtering is `date >= from && date <= to`
+  with no parser in the hot path.
 - **Tabular numerals** on every reading, timestamp, counter and ID.
 - **A failed collection never rewrites ONU state.** Collection Health counts the
   states left untouched (`stateLeftUnchanged`) and marks those rows amber, not red.
@@ -110,6 +119,6 @@ nested it inside `components/`, which contradicts §12.
 ## Not built yet
 
 Auth and roles, global search, REST client, SSE, the Diagnostics Console,
-CSV/JSON export, persistence of incident notes and state, OLT detail tabs for
-performance / collection history / configuration, and every page still marked
-`S<n>` in the sidebar.
+persistence of incident notes and state, OLT detail tabs for performance /
+collection history / configuration, and every page still marked `S<n>` in the
+sidebar.

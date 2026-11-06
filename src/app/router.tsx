@@ -9,11 +9,12 @@ import { IncidentsPage } from "../features/incidents/IncidentsPage";
 import { OpticalDiagnosticsPage } from "../features/optical/OpticalDiagnosticsPage";
 import { PlaceholderPage } from "../features/placeholder/PlaceholderPage";
 import { PonExplorerPage } from "../features/pons/PonExplorerPage";
+import { ReportsPage } from "../features/reports/ReportsPage";
 import { OnuDetailPage } from "../features/onus/OnuDetailPage";
 import { OnuListPage } from "../features/onus/OnuListPage";
 
 /** Nav paths that already render a real page. */
-const BUILT_PATHS = new Set(["/", "/olts", "/pons", "/onus", "/optical", "/incidents", "/collection"]);
+const BUILT_PATHS = new Set(["/", "/olts", "/pons", "/onus", "/optical", "/incidents", "/reports", "/collection"]);
 
 /**
  * Declarative routing: routes are JSX, and every remaining route is generated
@@ -34,6 +35,7 @@ export function AppRouter() {
           <Route path="/onus/:onuId" element={<OnuDetailPage />} />
           <Route path="/optical" element={<OpticalDiagnosticsPage />} />
           <Route path="/incidents" element={<IncidentsPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
           <Route path="/collection" element={<CollectionHealthPage />} />
           {placeholderRoutes.map((item) => (
             <Route

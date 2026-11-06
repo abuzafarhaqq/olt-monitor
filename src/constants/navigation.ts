@@ -32,7 +32,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Operations",
     items: [
       { path: "/optical", label: "Optical Diagnostics", stage: 4, built: true },
-      { path: "/reports", label: "History & Reports", stage: 6 },
+      { path: "/reports", label: "History & Reports", stage: 6, built: true },
       { path: "/collection", label: "Collection Health", stage: 2, built: true },
     ],
   },
