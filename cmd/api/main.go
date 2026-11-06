@@ -17,11 +17,14 @@ import (
 	"time"
 
 	"github.com/abuzafarhaqq/olt-monitor-backend/internal/api"
+	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store"
 	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/memory"
+	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/postgres"
 )
 
 func main() {
 	addr := flag.String("addr", ":8080", "listen address")
+	dsn := flag.String("dsn", os.Getenv("DATABASE_URL"), "Postgres DSN; empty = in-memory fixture")
 	logLevel := flag.String("log-level", "info", "debug|info|warn|error")
 	flag.Parse()
 
@@ -32,9 +35,26 @@ func main() {
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 
+	// Storage is a flag, not a rebuild: the same binary serves the fixture or a
+	// real database.
+	var dataStore store.Store
+	if *dsn == "" {
+		logger.Warn("no DSN given; serving the in-memory fixture")
+		dataStore = memory.New()
+	} else {
+		pg, err := postgres.New(context.Background(), *dsn)
+		if err != nil {
+			logger.Error("connect to postgres", "error", err)
+			os.Exit(1)
+		}
+		defer pg.Close()
+		logger.Info("connected to postgres")
+		dataStore = pg
+	}
+
 	server := &http.Server{
 		Addr:              *addr,
-		Handler:           api.NewServer(memory.New(), logger).Routes(),
+		Handler:           api.NewServer(dataStore, logger).Routes(),
 		ReadHeaderTimeout: 5 * time.Second,
 		// No WriteTimeout: it would kill long-lived SSE connections.
 		IdleTimeout: 120 * time.Second,
