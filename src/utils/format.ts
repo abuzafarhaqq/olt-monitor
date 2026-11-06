@@ -68,3 +68,12 @@ export function formatDuration(ms: number | null): string {
   if (ms < 1000) return `${ms} ms`;
   return `${(ms / 1000).toFixed(1)} s`;
 }
+
+/** Uptime from a device counter. A null is "not reported", never "0 days". */
+export function formatUptime(seconds: number | null): string {
+  if (seconds === null) return "not reported";
+  const days = Math.floor(seconds / 86_400);
+  const hours = Math.floor((seconds % 86_400) / 3_600);
+  if (days > 0) return `${days}d ${hours}h`;
+  return `${hours}h ${Math.floor((seconds % 3_600) / 60)}m`;
+}

@@ -22,8 +22,8 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Monitoring",
     items: [
       { path: "/", label: "Overview", stage: 1, built: true },
-      { path: "/olts", label: "OLT Inventory", stage: 3 },
-      { path: "/pons", label: "PON Explorer", stage: 3 },
+      { path: "/olts", label: "OLT Inventory", stage: 3, built: true },
+      { path: "/pons", label: "PON Explorer", stage: 3, built: true },
       { path: "/onus", label: "ONU Management", stage: 4 },
       { path: "/incidents", label: "Incidents & Events", stage: 5 },
     ],

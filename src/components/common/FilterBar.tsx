@@ -47,6 +47,33 @@ interface FilterBarProps {
   onReset?: () => void;
 }
 
+interface TextInputProps {
+  id: string;
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (value: string) => void;
+}
+
+/** Same contract as Select: React owns the value, the input reports intent. */
+export function TextInput({ id, label, value, placeholder, onChange }: TextInputProps) {
+  return (
+    <div className="filter-field filter-field--grow">
+      <label className="filter-field__label" htmlFor={id}>
+        {label}
+      </label>
+      <input
+        id={id}
+        type="search"
+        className="filter-field__control"
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  );
+}
+
 export function FilterBar({ children, summary, onReset }: FilterBarProps) {
   return (
     <div className="filter-bar" role="group" aria-label="Filters">

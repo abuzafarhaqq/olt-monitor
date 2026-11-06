@@ -66,6 +66,8 @@ interface OltSeed {
   connection: "ssh" | "telnet";
   reachable: boolean;
   firmware: string;
+  hardwareVersion: string;
+  uptimeSeconds: number | null;
   lastCollectionMinutesAgo: number;
   pons: PonSeed[];
 }
@@ -86,6 +88,8 @@ const OLT_SEEDS: OltSeed[] = [
     connection: "ssh",
     reachable: true,
     firmware: "demo-2.03.75",
+    hardwareVersion: "V1.1.4",
+    uptimeSeconds: 3_542_400,
     lastCollectionMinutesAgo: 3,
     pons: [
       { name: "epon 0/1", online: 12, offline: 2, unknown: 0 },
@@ -103,6 +107,8 @@ const OLT_SEEDS: OltSeed[] = [
     connection: "ssh",
     reachable: true,
     firmware: "demo-2.03.71",
+    hardwareVersion: "V1.1.4",
+    uptimeSeconds: 1_036_800,
     // Data is stale: collection succeeds but has not run recently.
     lastCollectionMinutesAgo: 47,
     pons: [
@@ -120,6 +126,8 @@ const OLT_SEEDS: OltSeed[] = [
     connection: "ssh",
     reachable: true,
     firmware: "demo-2.03.75",
+    hardwareVersion: "V1.1.4",
+    uptimeSeconds: 432_000,
     lastCollectionMinutesAgo: 6,
     pons: [
       { name: "gpon 0/1", online: 7, offline: 2, unknown: 1 },
@@ -136,6 +144,8 @@ const OLT_SEEDS: OltSeed[] = [
     connection: "telnet",
     reachable: false,
     firmware: "unknown",
+    hardwareVersion: "unknown",
+    uptimeSeconds: null,
     lastCollectionMinutesAgo: 21,
     pons: [{ name: "gpon 0/1", online: 0, offline: 0, unknown: 6 }],
   },
@@ -145,6 +155,7 @@ const ONU_MODEL: Record<string, string> = {
   "VSOL/EPON": "HG323",
   "VSOL/GPON": "HG323R",
   "C-Data/GPON": "FD611GW",
+  "C-Data/EPON": "FD511G",
 };
 
 function onuVendor(seed: OltSeed): Vendor {
@@ -198,6 +209,8 @@ for (const seed of OLT_SEEDS) {
           status === "online"
             ? "onu-register"
             : EVENT_LABELS[Math.floor(rng() * EVENT_LABELS.length)],
+        deregistrations24h:
+          status === "offline" ? 1 + Math.floor(rng() * 3) : 0,
         collectionStatus: status === "unknown" ? "failed" : "successful",
       });
     });
@@ -231,9 +244,9 @@ Object.assign(ref("olt-1", 1, 4), { rxPowerDbm: null, collectionStatus: "partial
 Object.assign(ref("olt-3", 1, 2), { rxPowerDbm: null, collectionStatus: "partial" as const });
 
 // Degraded optics while the ONU still reports online.
-Object.assign(ref("olt-1", 1, 2), { rxPowerDbm: -31.4 });
-Object.assign(ref("olt-1", 2, 1), { rxPowerDbm: -27.9 });
-Object.assign(ref("olt-3", 1, 3), { rxPowerDbm: -25.6 });
+Object.assign(ref("olt-1", 1, 2), { vendor: "VSOL" as const, model: "HG323", rxPowerDbm: -31.4 });
+Object.assign(ref("olt-1", 2, 1), { vendor: "VSOL" as const, model: "HG323", rxPowerDbm: -27.9 });
+Object.assign(ref("olt-3", 1, 3), { vendor: "VSOL" as const, model: "HG323R", rxPowerDbm: -25.6 });
 
 // Dying gasp: power-loss related, not proof of root cause.
 Object.assign(ref("olt-1", 2, 6), { lastEvent: "onu-dying-gasp" });
@@ -274,6 +287,8 @@ const olts: Olt[] = OLT_SEEDS.map((seed) => ({
   connection: seed.connection,
   reachable: seed.reachable,
   firmware: seed.firmware,
+  hardwareVersion: seed.hardwareVersion,
+  uptimeSeconds: seed.uptimeSeconds,
   ponCount: seed.pons.length,
   lastCollection: timestampsFor(seed),
   collectionStatus: collectionStatusForOlt(seed),
@@ -304,6 +319,7 @@ const pons: Pon[] = OLT_SEEDS.flatMap((seed) =>
       }).length,
       dyingGaspCount24h: ponOnus.filter((onu) => onu.lastEvent === "onu-dying-gasp").length,
       flappingCount: ponOnus.filter((onu) => onu.status === "offline").length > 3 ? 2 : 0,
+      lastCollection: timestampsFor(seed),
       collectionStatus: status,
     };
   }),

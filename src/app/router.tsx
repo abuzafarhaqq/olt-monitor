@@ -3,15 +3,17 @@ import { AppLayout } from "../components/layout/AppLayout";
 import { ALL_NAV_ITEMS } from "../constants/navigation";
 import { CollectionHealthPage } from "../features/collection/CollectionHealthPage";
 import { OverviewPage } from "../features/dashboard/OverviewPage";
+import { OltDetailPage } from "../features/olts/OltDetailPage";
+import { OltInventoryPage } from "../features/olts/OltInventoryPage";
 import { PlaceholderPage } from "../features/placeholder/PlaceholderPage";
+import { PonExplorerPage } from "../features/pons/PonExplorerPage";
 
-/** Routes that exist for real. Everything else still gets a placeholder. */
-const BUILT_PATHS = new Set(["/", "/collection"]);
+/** Nav paths that already render a real page. */
+const BUILT_PATHS = new Set(["/", "/olts", "/pons", "/collection"]);
 
 /**
- * Declarative routing: routes are JSX, and every non-overview route is
- * generated from the same navigation list the sidebar draws from. Adding a
- * page means adding one entry to navigation.ts and one element here.
+ * Declarative routing: routes are JSX, and every remaining route is generated
+ * from the same navigation list the sidebar draws from.
  */
 export function AppRouter() {
   const placeholderRoutes = ALL_NAV_ITEMS.filter((item) => !BUILT_PATHS.has(item.path));
@@ -21,6 +23,9 @@ export function AppRouter() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route index element={<OverviewPage />} />
+          <Route path="/olts" element={<OltInventoryPage />} />
+          <Route path="/olts/:oltId" element={<OltDetailPage />} />
+          <Route path="/pons" element={<PonExplorerPage />} />
           <Route path="/collection" element={<CollectionHealthPage />} />
           {placeholderRoutes.map((item) => (
             <Route

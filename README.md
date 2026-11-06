@@ -1,8 +1,9 @@
 # OLT Diagnostics — frontend (Stage 1)
 
 React 18 + TypeScript 5.6 + Vite 6. Application shell, routing, design tokens,
-reusable components, a mock-data Network Overview and a Collection Health page.
-No backend, no OLT connection, no authentication yet.
+reusable components, a mock-data Network Overview, Collection Health, OLT
+Inventory (with device detail) and PON Explorer. No backend, no OLT connection,
+no authentication yet.
 
 ## Run it
 
@@ -40,6 +41,9 @@ src/
   features/
     dashboard/    OverviewPage + OltHealthTable, RecentEvents, ProblemPons,
                   selectors.ts (all derived numbers live here)
+    olts/         OltInventoryPage, OltDetailPage, AddOltDrawer, selectors.ts
+    pons/         PonExplorerPage + selectors.ts (tree, ONU filters, PON metrics)
+    onus/         OnuTable, shared by PON Explorer and OLT detail
     collection/   CollectionHealthPage + selectors.ts (job filters, KPIs)
     placeholder/  PlaceholderPage for routes not built yet
   mock/           mockData.ts
@@ -69,6 +73,12 @@ nested it inside `components/`, which contradicts §12.
   events with different evidence references, and both are shown.
 - **Ranking uses fresh data only.** `getTopProblemPons` drops stale and failed
   PONs before sorting.
+- **No universal optical threshold.** `classifyRx` resolves the table by
+  `${vendor}/${technology}`; an ONU with no configured pair shows `No threshold`
+  in grey, never `OK`.
+- **A password has no input field.** The Add-OLT form takes a *credential
+  reference*; validation rejects an empty one and the form states that nothing
+  is saved until the write API exists.
 - **Tabular numerals** on every reading, timestamp, counter and ID.
 - **A failed collection never rewrites ONU state.** Collection Health counts the
   states left untouched (`stateLeftUnchanged`) and marks those rows amber, not red.
@@ -85,6 +95,7 @@ nested it inside `components/`, which contradicts §12.
 
 ## Not built yet
 
-Auth and roles, global search, filters beyond Collection Health, REST client,
-SSE, incident workflow, the Diagnostics Console, CSV/JSON export, and every page
-still marked `S<n>` in the sidebar.
+Auth and roles, global search, REST client, SSE, incident workflow, the
+Diagnostics Console, CSV/JSON export, OLT detail tabs for performance /
+collection history / configuration / raw evidence, and every page still marked
+`S<n>` in the sidebar.

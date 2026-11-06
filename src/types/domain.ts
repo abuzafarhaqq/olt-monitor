@@ -126,6 +126,10 @@ export interface Olt {
   connection: ConnectionMethod;
   reachable: boolean;
   firmware: string;
+  /** Hardware revision as printed by `show version`. */
+  hardwareVersion: string;
+  /** Boot uptime in seconds; null when the adapter cannot report it. */
+  uptimeSeconds: number | null;
   ponCount: number;
   lastCollection: DeviceTimestamps | null;
   collectionStatus: CollectionStatus;
@@ -148,6 +152,8 @@ export interface Pon {
   lowOpticalCount: number;
   dyingGaspCount24h: number;
   flappingCount: number;
+  /** Last successful collection for this port — per PON, not per OLT. */
+  lastCollection: DeviceTimestamps | null;
   collectionStatus: CollectionStatus;
 }
 
@@ -168,6 +174,8 @@ export interface Onu {
   /** false = the adapter has no optical command for this model. */
   opticalSupported: boolean;
   lastEvent: string | null;
+  /** Deregistrations in the last 24h — the evidence behind "flapping". */
+  deregistrations24h: number;
   collectionStatus: CollectionStatus;
 }
 
