@@ -93,6 +93,34 @@ time, so the response clock does not enumerate users.
 Not yet: TOTP verification, lockout after repeated failures, password reset,
 user-management endpoints, and the login page in the frontend.
 
+## Device credentials
+
+Credential storage turns on with a key, and only with a key:
+
+```bash
+export OLT_SECRETS_KEY="$(head -c 32 /dev/urandom | base64)"
+```
+
+Without it the credential endpoints answer `503 secrets_unconfigured` instead of
+storing a password in the clear.
+
+```
+POST   /api/v1/olts                    device.manage   → 201 created device
+PATCH  /api/v1/olts/{id}               device.manage   → 200 updated device
+PUT    /api/v1/olts/{id}/credential    device.manage   → 204, write-only
+GET    /api/v1/olts/{id}/credential    device.read     → username/keyVersion/updatedAt/updatedBy
+DELETE /api/v1/olts/{id}/credential    device.manage   → 204
+```
+
+The password is sealed with AES-256-GCM and stored as `BYTEA` in
+`olt_credentials`; the key never enters the database. There is no endpoint, no
+role and no flag that returns a stored password — the collector decrypts in
+process, immediately before dialling.
+
+Roles are enforced here, not in the browser: `internal/auth/permissions.go`
+mirrors the frontend's `ROLE_PERMISSIONS`, and a viewer calling a write endpoint
+gets 403 regardless of what the UI shows.
+
 ## Rules the code enforces
 
 - **A failed collection never writes ONU state.** `onus.status` only changes on

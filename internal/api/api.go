@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/abuzafarhaqq/olt-monitor-backend/internal/auth"
+	"github.com/abuzafarhaqq/olt-monitor-backend/internal/secrets"
 	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store"
 )
 
@@ -19,6 +21,8 @@ type Server struct {
 	store     store.Store
 	auth      store.AuthStore
 	audit     store.AuditStore
+	devices   store.DeviceStore
+	secrets   *secrets.Service
 	log       *slog.Logger
 	heartbeat time.Duration
 }
@@ -57,6 +61,14 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/auth/logout", s.logout)
 	mux.HandleFunc("GET /api/v1/auth/me", s.requireSession(s.me))
 	mux.HandleFunc("POST /api/v1/auth/password-reset", s.passwordResetRequest)
+
+	// Writes require a session and the right permission. The frontend hides the
+	// buttons; this is what actually stops the call.
+	mux.HandleFunc("POST /api/v1/olts", s.guard(auth.PermDeviceManage, s.createOlt))
+	mux.HandleFunc("PATCH /api/v1/olts/{id}", s.guard(auth.PermDeviceManage, s.updateOlt))
+	mux.HandleFunc("PUT /api/v1/olts/{id}/credential", s.guard(auth.PermDeviceManage, s.setCredential))
+	mux.HandleFunc("GET /api/v1/olts/{id}/credential", s.guard(auth.PermDeviceRead, s.getCredentialMeta))
+	mux.HandleFunc("DELETE /api/v1/olts/{id}/credential", s.guard(auth.PermDeviceManage, s.deleteCredential))
 
 	return s.recoverer(s.logger(mux))
 }

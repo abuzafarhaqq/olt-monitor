@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/abuzafarhaqq/olt-monitor-backend/internal/api"
+	"github.com/abuzafarhaqq/olt-monitor-backend/internal/crypto"
+	"github.com/abuzafarhaqq/olt-monitor-backend/internal/secrets"
 	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/memory"
 	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/postgres"
 )
@@ -48,7 +50,24 @@ func main() {
 		}
 		defer pg.Close()
 		logger.Info("connected to postgres")
-		handler = api.NewServer(pg, logger).WithAuth(pg).WithAudit(pg).Routes()
+		server := api.NewServer(pg, logger).WithAuth(pg).WithAudit(pg).WithDevices(pg)
+
+		// Credential storage needs a key. Without one the endpoints answer 503
+		// rather than storing device passwords in the clear.
+		key, keyErr := crypto.KeyFromEnv("OLT_SECRETS_KEY")
+		if keyErr != nil {
+			logger.Warn("credential storage disabled", "reason", keyErr)
+		} else {
+			ring, ringErr := crypto.NewKeyring(1, key)
+			if ringErr != nil {
+				logger.Error("credential key invalid", "error", ringErr)
+				os.Exit(1)
+			}
+			server = server.WithSecrets(secrets.New(ring, pg))
+			logger.Info("credential storage enabled")
+		}
+
+		handler = server.Routes()
 	}
 
 	server := &http.Server{

@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"time"
+
+	"github.com/abuzafarhaqq/olt-monitor-backend/internal/domain"
 )
 
 // User carries the password hash because the authentication path needs it.
@@ -35,4 +37,25 @@ type AuthStore interface {
 // does not have to pretend to keep an audit trail.
 type AuditStore interface {
 	RecordAudit(ctx context.Context, actor, action, target, detail string) error
+}
+
+// OltWrite is the editable shape of a device. Defined here, not in postgres, so
+// the HTTP layer can write devices without importing a storage driver.
+type OltWrite struct {
+	ID                string
+	Name              string
+	Vendor            string
+	Model             string
+	Technology        string
+	ManagementAddress string
+	ManagementPort    int
+	Connection        string
+	Enabled           bool
+}
+
+// DeviceStore is the write side of the inventory.
+type DeviceStore interface {
+	Store
+	CreateOlt(ctx context.Context, p OltWrite) (domain.Olt, error)
+	UpdateOlt(ctx context.Context, p OltWrite) (domain.Olt, error)
 }

@@ -29,10 +29,10 @@ TRUNCATE audit_log, incident_notes, incident_evidence, incidents,
   RESTART IDENTITY CASCADE;
 
 INSERT INTO olts (id, name, vendor, model, technology, management_address, management_port,
-                  connection, credential_ref, collection_profile)
+                  connection, collection_profile)
 VALUES
- ('olt-1', 'EPON-OLT-01', 'VSOL',  'EPON-OLT', 'EPON', '192.0.2.11', 22, 'ssh',    'vault/olt/olt-1', 'standard-5m'),
- ('olt-2', 'GPON-OLT-02', 'C-Data','FD-OLT',   'GPON', '192.0.2.14', 23, 'telnet', 'vault/olt/olt-2', 'standard-5m');
+ ('olt-1', 'EPON-OLT-01', 'VSOL',  'EPON-OLT', 'EPON', '192.0.2.11', 22, 'ssh',    'standard-5m'),
+ ('olt-2', 'GPON-OLT-02', 'C-Data','FD-OLT',   'GPON', '192.0.2.14', 23, 'telnet', 'standard-5m');
 
 INSERT INTO olt_state (olt_id, reachable, firmware, hardware_version, uptime_seconds,
                        device_time, clock_quality, observed_at, collection_status)
