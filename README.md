@@ -60,6 +60,38 @@ TEST_DATABASE_URL="postgres://oltmon:oltmon@localhost:5432/oltmon_test?sslmode=d
 Errors are `{"error":{"code":"not_found","message":"..."}}`. A missing row is
 404; everything else is a 500 that does not leak internals.
 
+## Authentication
+
+Users live in Postgres (`migrations/0002_users.sql`). Three secrets, three
+treatments: password → **argon2id** PHC string; security answer → argon2id;
+TOTP secret → **AES-256-GCM** (`internal/crypto`), because it must be
+reproduced to check a code.
+
+Sessions are random 32-byte tokens; the database stores only the SHA-256 hash,
+so a dump cannot be replayed as a login. Cookie is `HttpOnly`, `SameSite=Strict`,
+`Secure` whenever the request arrived over TLS, 12-hour expiry.
+
+```bash
+# bootstrap the first account (password is prompted, never a flag)
+DATABASE_URL=... userctl create -username alice -name "Alice Rahman" \
+  -email alice@example.net -role administrator
+DATABASE_URL=... userctl passwd -username alice    # also revokes her sessions
+DATABASE_URL=... userctl list
+```
+
+```
+POST /api/v1/auth/login   {username, password}  → 200 + session cookie
+GET  /api/v1/auth/me                            → 401 without a session
+POST /api/v1/auth/logout                        → 204, row revoked
+```
+
+An unknown username, a wrong password and a disabled account all answer the
+same 401 with the same body — and an unknown username still spends the argon2
+time, so the response clock does not enumerate users.
+
+Not yet: TOTP verification, lockout after repeated failures, password reset,
+user-management endpoints, and the login page in the frontend.
+
 ## Rules the code enforces
 
 - **A failed collection never writes ONU state.** `onus.status` only changes on

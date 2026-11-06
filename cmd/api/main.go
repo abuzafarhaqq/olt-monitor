@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/abuzafarhaqq/olt-monitor-backend/internal/api"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store"
 	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/memory"
 	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/postgres"
 )
@@ -36,11 +35,11 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 
 	// Storage is a flag, not a rebuild: the same binary serves the fixture or a
-	// real database.
-	var dataStore store.Store
+	// real database. Only Postgres can hold users, so only Postgres enables login.
+	var handler http.Handler
 	if *dsn == "" {
-		logger.Warn("no DSN given; serving the in-memory fixture")
-		dataStore = memory.New()
+		logger.Warn("no DSN given; serving the in-memory fixture without authentication")
+		handler = api.NewServer(memory.New(), logger).Routes()
 	} else {
 		pg, err := postgres.New(context.Background(), *dsn)
 		if err != nil {
@@ -49,12 +48,12 @@ func main() {
 		}
 		defer pg.Close()
 		logger.Info("connected to postgres")
-		dataStore = pg
+		handler = api.NewServer(pg, logger).WithAuth(pg).Routes()
 	}
 
 	server := &http.Server{
 		Addr:              *addr,
-		Handler:           api.NewServer(dataStore, logger).Routes(),
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		// No WriteTimeout: it would kill long-lived SSE connections.
 		IdleTimeout: 120 * time.Second,
