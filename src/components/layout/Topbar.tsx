@@ -1,4 +1,7 @@
+import { useAuth } from "../../app/AuthContext";
+import { useLiveEvents } from "../../hooks/useLiveEvents";
 import { MOCK_OVERVIEW } from "../../mock/mockData";
+import { ROLES } from "../../services/auth";
 import { formatRelative } from "../../utils/format";
 
 interface TopbarProps {
@@ -7,6 +10,10 @@ interface TopbarProps {
 }
 
 export function Topbar({ navOpen, onToggleNav }: TopbarProps) {
+  const { user, setRole } = useAuth();
+  const liveEvents = useLiveEvents(5);
+  const lastEvent = liveEvents[0];
+
   return (
     <header className="topbar">
       <button
@@ -26,7 +33,7 @@ export function Topbar({ navOpen, onToggleNav }: TopbarProps) {
         <input
           id="global-search"
           type="search"
-          placeholder="Search OLT, ONU, MAC, incident… (stage 2)"
+          placeholder="Search OLT, ONU, MAC, incident… (stage 8)"
           // Searching live data before the API exists would be a lie.
           disabled
         />
@@ -37,14 +44,31 @@ export function Topbar({ navOpen, onToggleNav }: TopbarProps) {
           <span className="topbar__dot topbar__dot--mock" aria-hidden="true" />
           API: mock
         </span>
-        <span className="topbar__status">
-          <span className="topbar__dot" aria-hidden="true" />
-          Live updates: off
+        <span className="topbar__status" title={lastEvent?.message ?? "No live event yet"}>
+          <span
+            className={`topbar__dot ${liveEvents.length > 0 ? "topbar__dot--live" : ""}`}
+            aria-hidden="true"
+          />
+          {liveEvents.length > 0 ? `live · ${liveEvents.length}` : "live: idle"}
         </span>
         <span className="topbar__status tabular">
           snapshot {formatRelative(MOCK_OVERVIEW.generatedAt)}
         </span>
-        <span className="topbar__user">NOC Operator</span>
+
+        <label className="topbar__role">
+          <span className="visually-hidden">Role</span>
+          <select
+            className="filter-field__control topbar__role-select"
+            value={user.role}
+            onChange={(event) => setRole(event.target.value as typeof user.role)}
+          >
+            {ROLES.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
     </header>
   );

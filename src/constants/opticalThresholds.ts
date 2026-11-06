@@ -79,3 +79,14 @@ export function findThreshold(
 ): OpticalThreshold | null {
   return THRESHOLDS[`${vendor}/${technology}`] ?? null;
 }
+
+/** Read-only view of the calibrated pairs, for the settings page. */
+export function listThresholds(): { pair: string; warningDbm: number; criticalDbm: number }[] {
+  return Object.entries(THRESHOLDS)
+    .filter((entry): entry is [string, OpticalThreshold] => entry[1] !== undefined)
+    .map(([pair, threshold]) => ({
+      pair,
+      warningDbm: threshold.warningDbm,
+      criticalDbm: threshold.criticalDbm,
+    }));
+}

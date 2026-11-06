@@ -306,3 +306,24 @@ export interface OnuDiagnostics {
   history: OpticalHistoryPoint[];
   evidence: RawEvidence[];
 }
+
+/* -------------------------------------------------------------------------
+ * Diagnostics console (§5.9)
+ * ---------------------------------------------------------------------- */
+
+/** An adapter-approved command. The browser sends an id, never raw CLI. */
+export interface DiagnosticCommand {
+  id: string;
+  technology: "EPON" | "GPON" | "any";
+  label: string;
+  command: string;
+}
+
+export interface DiagnosticResult {
+  command: string;
+  startedAt: string;
+  durationMs: number;
+  result: "ok" | "failed";
+  text: string;
+  evidenceRef: string;
+}

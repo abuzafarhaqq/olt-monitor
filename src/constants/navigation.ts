@@ -39,9 +39,9 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "System",
     items: [
-      { path: "/console", label: "Diagnostics Console", stage: 7 },
-      { path: "/users", label: "Users & Access", stage: 7 },
-      { path: "/settings", label: "Settings", stage: 7 },
+      { path: "/console", label: "Diagnostics Console", stage: 7, built: true },
+      { path: "/users", label: "Users & Access", stage: 7, built: true },
+      { path: "/settings", label: "Settings", stage: 7, built: true },
     ],
   },
 ];

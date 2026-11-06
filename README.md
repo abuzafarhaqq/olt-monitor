@@ -3,8 +3,13 @@
 React 18 + TypeScript 5.6 + Vite 6. Application shell, routing, design tokens,
 reusable components, a mock-data Network Overview, Collection Health, OLT
 Inventory (with device detail), PON Explorer, ONU Management with per-ONU
-diagnostics, Optical Diagnostics, Incidents & Events, and History & Reports
-with CSV/JSON export. No backend, no OLT connection, no authentication yet.
+diagnostics, Optical Diagnostics, Incidents & Events, History & Reports with
+CSV/JSON export, a Diagnostics Console, Users & Access and Settings.
+
+The service layer talks to the Go API through `services/api.ts`; until that API
+exists it runs against `services/mockBackend.ts` behind one switch
+(`USE_MOCK_API` in `services/client.ts`). No OLT is ever contacted by the
+browser, and there is no real login yet.
 
 ## Run it
 
@@ -31,7 +36,10 @@ rather than a page.
 
 ```
 src/
-  app/            App.tsx, router.tsx (declarative react-router)
+  app/            App.tsx, router.tsx (declarative react-router), AuthContext.tsx
+  services/       api.ts (transport), mockBackend.ts, client.ts (the switch),
+                  auth.ts (roles + permissions), sse.ts (live feed)
+  hooks/          useLiveEvents.ts
   components/
     layout/       AppLayout, Sidebar, Topbar
     common/       PageHeader, MetricCard, StatusBadge, CollectionBadge,
@@ -48,6 +56,9 @@ src/
     optical/      OpticalDiagnosticsPage + selectors.ts (RX distribution, per-PON health)
     incidents/    IncidentsPage, IncidentDrawer, selectors.ts
     reports/      ReportsPage + selectors.ts (range, comparison, rows)
+    console/      DiagnosticsConsolePage (allow-listed commands only)
+    users/        UsersAccessPage (roles + permission matrix)
+    settings/     SettingsPage (thresholds, intervals, retention, audit)
     collection/   CollectionHealthPage + selectors.ts (job filters, KPIs)
     placeholder/  PlaceholderPage for routes not built yet
   mock/           mockData.ts
@@ -102,6 +113,12 @@ nested it inside `components/`, which contradicts §12.
   so the two files can never disagree.
 - **ISO dates compare as strings.** Range filtering is `date >= from && date <= to`
   with no parser in the hot path.
+- **No free-text command reaches a device.** The console posts a command *id*
+  from an allow-list; the adapter maps it to CLI server-side.
+- **Hiding a button is not authorisation.** `PermissionGate` controls rendering;
+  every endpoint must re-check the caller's role.
+- **One switch, one place.** `USE_MOCK_API` decides between fixtures and the API;
+  no component knows which is active.
 - **Tabular numerals** on every reading, timestamp, counter and ID.
 - **A failed collection never rewrites ONU state.** Collection Health counts the
   states left untouched (`stateLeftUnchanged`) and marks those rows amber, not red.
@@ -118,7 +135,8 @@ nested it inside `components/`, which contradicts §12.
 
 ## Not built yet
 
-Auth and roles, global search, REST client, SSE, the Diagnostics Console,
-persistence of incident notes and state, OLT detail tabs for performance /
-collection history / configuration, and every page still marked `S<n>` in the
-sidebar.
+The Go backend and OLT collector, real authentication and token handling, the
+live SSE endpoint (the client consumes a mock feed of the same shape), global
+search, persistence of incident notes and state, OLT detail tabs for performance
+/ collection history / configuration, and the 25k-row performance and
+accessibility work of stage 8.
