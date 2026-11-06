@@ -7,7 +7,6 @@ import { FreshnessIndicator } from "../../components/common/FreshnessIndicator";
 import { PageHeader } from "../../components/common/PageHeader";
 import { MOCK_OVERVIEW } from "../../mock/mockData";
 import { formatCount } from "../../utils/format";
-import { AddOltDrawer } from "./AddOltDrawer";
 import {
   EMPTY_OLT_FILTERS,
   filterOltRows,
@@ -20,7 +19,6 @@ export function OltInventoryPage() {
   const data = MOCK_OVERVIEW;
   const rows = getOltRows(data);
   const [filters, setFilters] = useState<OltFilters>(EMPTY_OLT_FILTERS);
-  const [adding, setAdding] = useState(false);
 
   const visible = filterOltRows(rows, filters);
 
@@ -82,9 +80,14 @@ export function OltInventoryPage() {
       header: "",
       align: "right",
       render: ({ olt }) => (
-        <Link className="btn btn--small" to={`/olts/${olt.id}`}>
-          Open
-        </Link>
+        <div className="row-actions">
+          <Link className="btn btn--small" to={`/olts/${olt.id}`}>
+            Open
+          </Link>
+          <Link className="btn btn--small" to={`/olts/${olt.id}/edit`}>
+            Edit
+          </Link>
+        </div>
       ),
     },
   ];
@@ -96,9 +99,9 @@ export function OltInventoryPage() {
         subtitle={`${rows.length} devices · ${data.olts.filter((olt) => olt.reachable).length} reachable`}
         isMock
         actions={
-          <button type="button" className="btn btn--primary" onClick={() => setAdding(true)}>
+          <Link className="btn btn--primary" to="/olts/new">
             Add OLT
-          </button>
+          </Link>
         }
       />
 
@@ -150,7 +153,6 @@ export function OltInventoryPage() {
         </div>
       </section>
 
-      {adding ? <AddOltDrawer onClose={() => setAdding(false)} /> : null}
     </>
   );
 }

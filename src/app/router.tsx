@@ -9,6 +9,7 @@ import { DiagnosticsConsolePage } from "../features/console/DiagnosticsConsolePa
 import { OverviewPage } from "../features/dashboard/OverviewPage";
 import { IncidentsPage } from "../features/incidents/IncidentsPage";
 import { OltDetailPage } from "../features/olts/OltDetailPage";
+import { OltFormPage } from "../features/olts/OltFormPage";
 import { OltInventoryPage } from "../features/olts/OltInventoryPage";
 import { OpticalDiagnosticsPage } from "../features/optical/OpticalDiagnosticsPage";
 import { OnuDetailPage } from "../features/onus/OnuDetailPage";
@@ -55,6 +56,8 @@ export function AppRouter() {
         >
           <Route index element={<OverviewPage />} />
           <Route path="/olts" element={<OltInventoryPage />} />
+          <Route path="/olts/new" element={<OltFormPage />} />
+          <Route path="/olts/:oltId/edit" element={<OltFormPage />} />
           <Route path="/olts/:oltId" element={<OltDetailPage />} />
           <Route path="/pons" element={<PonExplorerPage />} />
           <Route path="/onus" element={<OnuListPage />} />

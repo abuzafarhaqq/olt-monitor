@@ -88,6 +88,20 @@ The top bar shows the signed-in user, their role and a sign-out button; the role
 switcher is gone. Permissions come from the session, and no session means no
 permissions — `can()` returns false when there is no user.
 
+## Adding and editing a device
+
+`/olts/new` and `/olts/:oltId/edit` share one form: identity, management access,
+and credentials. The password field is write-only — it is sent once, encrypted by
+the API, and cannot be read back by anyone, including an administrator.
+
+Writes require the `device.manage` permission; the form is replaced by a
+read-only notice for other roles, and the API re-checks it.
+
+With `USE_MOCK_API = true` the form validates and explains that saving needs the
+API. There is no fake persistence: a device you "create" in mock mode is not
+remembered, because pretending otherwise is how someone loses an hour to a
+bug that does not exist.
+
 ## Rules this stage already enforces
 
 - **Operational state ≠ collection state.** `OnuStatus` (online / offline /
