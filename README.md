@@ -1,8 +1,8 @@
 # OLT Diagnostics — frontend (Stage 1)
 
 React 18 + TypeScript 5.6 + Vite 6. Application shell, routing, design tokens,
-reusable components and a mock-data Network Overview. No backend, no OLT
-connection, no authentication yet.
+reusable components, a mock-data Network Overview and a Collection Health page.
+No backend, no OLT connection, no authentication yet.
 
 ## Run it
 
@@ -40,6 +40,7 @@ src/
   features/
     dashboard/    OverviewPage + OltHealthTable, RecentEvents, ProblemPons,
                   selectors.ts (all derived numbers live here)
+    collection/   CollectionHealthPage + selectors.ts (job filters, KPIs)
     placeholder/  PlaceholderPage for routes not built yet
   mock/           mockData.ts
   styles/         tokens.css, global.css, layout.css, components.css, dashboard.css
@@ -69,6 +70,8 @@ nested it inside `components/`, which contradicts §12.
 - **Ranking uses fresh data only.** `getTopProblemPons` drops stale and failed
   PONs before sorting.
 - **Tabular numerals** on every reading, timestamp, counter and ID.
+- **A failed collection never rewrites ONU state.** Collection Health counts the
+  states left untouched (`stateLeftUnchanged`) and marks those rows amber, not red.
 
 ## Deviations from the spec (deliberate)
 
@@ -82,6 +85,6 @@ nested it inside `components/`, which contradicts §12.
 
 ## Not built yet
 
-Auth and roles, global search, filters, REST client, SSE, incident workflow,
-the Diagnostics Console, CSV/JSON export, and every page marked `S<n>` in the
-sidebar.
+Auth and roles, global search, filters beyond Collection Health, REST client,
+SSE, incident workflow, the Diagnostics Console, CSV/JSON export, and every page
+still marked `S<n>` in the sidebar.

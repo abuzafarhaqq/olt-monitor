@@ -35,7 +35,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 }
               >
                 <span>{item.label}</span>
-                {item.stage > 1 ? (
+                {item.stage > 1 && item.built !== true ? (
                   <span className="sidebar__link-badge" title={`Planned for stage ${item.stage}`}>
                     S{item.stage}
                   </span>

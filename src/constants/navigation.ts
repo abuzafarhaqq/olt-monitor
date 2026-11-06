@@ -8,6 +8,8 @@ export interface NavItem {
   label: string;
   /** Stage that will implement it. Pure documentation for the user. */
   stage: number;
+  /** Implemented already — no "S<n>" badge in the sidebar. */
+  built?: boolean;
 }
 
 export interface NavGroup {
@@ -19,7 +21,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "Monitoring",
     items: [
-      { path: "/", label: "Overview", stage: 1 },
+      { path: "/", label: "Overview", stage: 1, built: true },
       { path: "/olts", label: "OLT Inventory", stage: 3 },
       { path: "/pons", label: "PON Explorer", stage: 3 },
       { path: "/onus", label: "ONU Management", stage: 4 },
@@ -31,7 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { path: "/optical", label: "Optical Diagnostics", stage: 4 },
       { path: "/reports", label: "History & Reports", stage: 6 },
-      { path: "/collection", label: "Collection Health", stage: 2 },
+      { path: "/collection", label: "Collection Health", stage: 2, built: true },
     ],
   },
   {

@@ -25,6 +25,78 @@ export type CollectionJobResult =
 
 export type Technology = "EPON" | "GPON";
 
+/* -------------------------------------------------------------------------
+ * Collection health (§5.8). Kept beside the device types because the whole
+ * point is that they are separate: a job result never rewrites ONU state.
+ * ---------------------------------------------------------------------- */
+
+/** One adapter-approved query. Arbitrary CLI is not a job type. */
+export type CollectionJobType =
+  | "onu-status"
+  | "onu-optical"
+  | "onu-basic-info"
+  | "syslog-onu-events"
+  | "alarm-catalog"
+  | "device-info";
+
+/**
+ * Why a run failed, in the vocabulary an operator can act on:
+ * connectivity → network, auth → credentials, parser → our code,
+ * capability → the device does not expose it.
+ */
+export type JobErrorKind = "timeout" | "auth" | "network" | "parser" | "capability";
+
+export interface JobError {
+  kind: JobErrorKind;
+  message: string;
+}
+
+export interface CollectionJob {
+  id: string;
+  oltId: string;
+  type: CollectionJobType;
+  result: CollectionJobResult;
+  /** Ingestion clock — the only timestamp we trust. */
+  lastRunAt: string;
+  durationMs: number | null;
+  error: JobError | null;
+  /**
+   * ONUs whose stored status was deliberately left untouched because this run
+   * produced no authoritative answer. null = the run did not touch ONU state.
+   */
+  stateLeftUnchanged: number | null;
+}
+
+export type CollectorState = "idle" | "running" | "degraded" | "stopped";
+
+export interface Collector {
+  id: string;
+  name: string;
+  state: CollectorState;
+  runningJobs: number;
+  queuedJobs: number;
+  /** Collector heartbeat. null = never reported since start. */
+  heartbeatAt: string | null;
+}
+
+export interface StaleSource {
+  oltId: string;
+  lastSuccessAt: string | null;
+  ageMinutes: number;
+  /** Collection profile interval, so "age 47m" can be judged against 5m. */
+  intervalMinutes: number;
+  reason: string;
+}
+
+export interface CollectionHealthResponse {
+  generatedAt: string;
+  collectors: Collector[];
+  jobs: CollectionJob[];
+  /** Device identity only — the page never needs full OLT records. */
+  olts: Olt[];
+  staleSources: StaleSource[];
+}
+
 export type Vendor = "VSOL" | "C-Data";
 
 export type ConnectionMethod = "ssh" | "telnet";

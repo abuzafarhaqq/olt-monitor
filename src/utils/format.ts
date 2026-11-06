@@ -61,3 +61,10 @@ export function formatDistance(meters: number | null): string {
 export function formatCount(value: number): string {
   return value.toLocaleString("en-GB");
 }
+
+/** "820 ms", "1.4 s", "12 s". null = the run produced no duration. */
+export function formatDuration(ms: number | null): string {
+  if (ms === null) return "—";
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(1)} s`;
+}
