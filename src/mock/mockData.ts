@@ -465,6 +465,21 @@ const incidents: Incident[] = [
     openedAt: minutesAgo(186),
     hypothesis:
       "Four ONUs deregistered within 20 minutes. Shared PON outage is suspected but not confirmed — the OLT itself is reachable and PON 0/1 is unaffected.",
+    evidenceEventIds: ["evt-1001", "evt-1002", "evt-1008"],
+    notes: [
+      {
+        id: "note-1",
+        author: "NOC Operator",
+        at: minutesAgo(150),
+        text: "Acknowledged. Two of the four ONUs came back and dropped again. Checking the splitter cabinet on site.",
+      },
+      {
+        id: "note-2",
+        author: "Network Engineer",
+        at: minutesAgo(90),
+        text: "Dying gasp present on ONU 6 only; the other three just deregistered. That points at local power, not the PON.",
+      },
+    ],
   },
   {
     id: "INC-2411-008",
@@ -475,6 +490,8 @@ const incidents: Incident[] = [
     ponId: null,
     openedAt: minutesAgo(21),
     hypothesis: "Management connectivity lost. ONU state on this OLT is last known, not current.",
+    evidenceEventIds: ["evt-1004"],
+    notes: [],
   },
   {
     id: "INC-2411-004",
@@ -485,6 +502,15 @@ const incidents: Incident[] = [
     ponId: "olt-1-pon3",
     openedAt: minutesAgo(320),
     hypothesis: "Serial mismatch after ONU replacement. Awaiting field confirmation.",
+    evidenceEventIds: ["evt-1006"],
+    notes: [
+      {
+        id: "note-3",
+        author: "NOC Operator",
+        at: minutesAgo(300),
+        text: "Customer reports a replacement ONU installed yesterday. Auth failures start 06:12.",
+      },
+    ],
   },
   {
     id: "INC-2410-019",
@@ -494,6 +520,15 @@ const incidents: Incident[] = [
     oltId: "olt-3",
     ponId: "olt-3-pon1",
     openedAt: minutesAgo(60 * 26),
+    evidenceEventIds: ["evt-1005"],
+    notes: [
+      {
+        id: "note-4",
+        author: "Network Engineer",
+        at: minutesAgo(60 * 25),
+        text: "Parser matched 9 of 10 rows; the tenth is an ONU model we do not parse yet. Collection treated as partial, ONU state untouched.",
+      },
+    ],
   },
 ];
 

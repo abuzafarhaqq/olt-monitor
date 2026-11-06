@@ -3,8 +3,8 @@
 React 18 + TypeScript 5.6 + Vite 6. Application shell, routing, design tokens,
 reusable components, a mock-data Network Overview, Collection Health, OLT
 Inventory (with device detail), PON Explorer, ONU Management with per-ONU
-diagnostics, and Optical Diagnostics. No backend, no OLT connection, no
-authentication yet.
+diagnostics, Optical Diagnostics, and Incidents & Events. No backend, no OLT
+connection, no authentication yet.
 
 ## Run it
 
@@ -46,6 +46,7 @@ src/
     pons/         PonExplorerPage + selectors.ts (tree, ONU filters, PON metrics)
     onus/         OnuListPage, OnuDetailPage, OnuTable, selectors.ts
     optical/      OpticalDiagnosticsPage + selectors.ts (RX distribution, per-PON health)
+    incidents/    IncidentsPage, IncidentDrawer, selectors.ts
     collection/   CollectionHealthPage + selectors.ts (job filters, KPIs)
     placeholder/  PlaceholderPage for routes not built yet
   mock/           mockData.ts
@@ -86,6 +87,12 @@ nested it inside `components/`, which contradicts §12.
 - **A password has no input field.** The Add-OLT form takes a *credential
   reference*; validation rejects an empty one and the form states that nothing
   is saved until the write API exists.
+- **The workflow is a graph, not a dropdown.** `ALLOWED_TRANSITIONS` defines the
+  legal moves, so the drawer cannot offer a transition the backend would reject.
+- **A hypothesis stays a hypothesis.** The suspected PON outage is rendered in a
+  purple callout prefixed "not a confirmed root cause", never as a verdict.
+- **Incident changes are session-local** and the page says so whenever one is
+  made; nothing is written anywhere until the write API exists.
 - **Tabular numerals** on every reading, timestamp, counter and ID.
 - **A failed collection never rewrites ONU state.** Collection Health counts the
   states left untouched (`stateLeftUnchanged`) and marks those rows amber, not red.
@@ -102,7 +109,7 @@ nested it inside `components/`, which contradicts §12.
 
 ## Not built yet
 
-Auth and roles, global search, REST client, SSE, incident workflow, the
-Diagnostics Console, CSV/JSON export, OLT detail tabs for performance /
-collection history / configuration, and every page still marked `S<n>` in the
-sidebar.
+Auth and roles, global search, REST client, SSE, the Diagnostics Console,
+CSV/JSON export, persistence of incident notes and state, OLT detail tabs for
+performance / collection history / configuration, and every page still marked
+`S<n>` in the sidebar.

@@ -216,6 +216,13 @@ export type IncidentState =
   | "resolved"
   | "closed";
 
+export interface IncidentNote {
+  id: string;
+  author: string;
+  at: string;
+  text: string;
+}
+
 export interface Incident {
   id: string;
   title: string;
@@ -226,6 +233,9 @@ export interface Incident {
   openedAt: string;
   /** A suspected PON-wide outage is a hypothesis, not a root cause. */
   hypothesis?: string;
+  /** Events correlated into this case — the evidence behind the hypothesis. */
+  evidenceEventIds: string[];
+  notes: IncidentNote[];
 }
 
 export interface AvailabilityPoint {

@@ -25,7 +25,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { path: "/olts", label: "OLT Inventory", stage: 3, built: true },
       { path: "/pons", label: "PON Explorer", stage: 3, built: true },
       { path: "/onus", label: "ONU Management", stage: 4, built: true },
-      { path: "/incidents", label: "Incidents & Events", stage: 5 },
+      { path: "/incidents", label: "Incidents & Events", stage: 5, built: true },
     ],
   },
   {
