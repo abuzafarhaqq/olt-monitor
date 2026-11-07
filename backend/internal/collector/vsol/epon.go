@@ -64,9 +64,7 @@ var commands = []collector.Command{
 	{ID: "onu-status-pon3", Line: "show onu status pon 3", Parse: parseOnuStatus},
 	{ID: "onu-status-pon4", Line: "show onu status pon 4", Parse: parseOnuStatus},
 	{ID: "opm-diag", Line: "show onu opm-diag all", Parse: parseOptical},
-	// Exists per `show onu ?` ("Specify onu basic information"). No parser yet:
-	// the output has not been captured.
-	{ID: "onu-basic-info", Line: "show onu basic-info all"},
+	{ID: "onu-basic-info", Line: "show onu basic-info all", Parse: parseBasicInfo},
 	{ID: "opm-diag-pon1", Line: "show onu opm-diag pon 1", Parse: parseOptical},
 	{ID: "opm-diag-pon2", Line: "show onu opm-diag pon 2", Parse: parseOptical},
 	{ID: "opm-diag-pon3", Line: "show onu opm-diag pon 3", Parse: parseOptical},
@@ -284,4 +282,54 @@ func atof(value string) float64 {
 		return 0
 	}
 	return f
+}
+
+// --- ONU identity --------------------------------------------------------
+
+// OnuIdentity is one line of `show onu basic-info all`:
+//
+//	EPON0/1:1   MONU   D301   8014A84FE0A0  V8.0   V6.0.1P1T2   SFU   1GE
+//
+// The ID column is the ONU serial number and is deliberately NOT parsed: it is
+// a device identifier, it must not reach a row, a log, an export or an example,
+// and nothing in this platform needs it — MAC plus port and ONU number already
+// identify a subscriber's ONU.
+type OnuIdentity struct {
+	Pon           string
+	OnuID         int
+	Vendor        string
+	Model         string
+	HardwareVer   string
+	SoftwareVer   string
+	Type          string
+	InterfaceType string
+}
+
+var reBasicRow = regexp.MustCompile(
+	`^(?:EPON)?(\d+/\d+):(\d+)\s+(\S+)\s+(\S+)\s+[0-9A-Fa-f]{4,}\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$`)
+
+func parseBasicInfo(output string) (any, error) {
+	rows := make([]OnuIdentity, 0, 256)
+
+	for _, line := range strings.Split(output, "\n") {
+		match := reBasicRow.FindStringSubmatch(strings.TrimSpace(line))
+		if match == nil {
+			continue
+		}
+		rows = append(rows, OnuIdentity{
+			Pon:           match[1],
+			OnuID:         atoi(match[2]),
+			Vendor:        match[3],
+			Model:         match[4],
+			HardwareVer:   match[5],
+			SoftwareVer:   match[6],
+			Type:          match[7],
+			InterfaceType: match[8],
+		})
+	}
+
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no ONU identity rows recognised")
+	}
+	return rows, nil
 }

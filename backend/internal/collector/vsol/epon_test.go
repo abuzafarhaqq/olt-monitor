@@ -1,6 +1,7 @@
 package vsol_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/collector/vsol"
@@ -197,5 +198,52 @@ func TestOpticalRejectsGarbage(t *testing.T) {
 func TestAdapterRequiresConfigMode(t *testing.T) {
 	if !vsol.New().RequiresConfigMode() {
 		t.Fatal("vsol-epon must declare config mode; its show commands live there")
+	}
+}
+
+// From a live `show onu basic-info all`. The ID column (ONU serial) is replaced
+// with zeros here and is never parsed by the adapter.
+const basicInfoSample = `ONU-ID      VendorID  Model     ID            hwVer     SwVer               Type                Interface Type
+------      --------  -----     --            -----     --------            ---------           ---------
+EPON0/1:1   MONU      D301      000000000000  V8.0      V6.0.1P1T2          SFU                 1GE
+EPON0/1:5   HWTC      XPON      000000000000  V9.0      V9.0.51P1T11        SFU                 1GE
+EPON0/2:9   ZTE       112E      000000000000  V1.0      V1.0.0              HGU                 1GE+CATV
+`
+
+func TestParseBasicInfo(t *testing.T) {
+	command, ok := vsol.New().Command("onu-basic-info")
+	if !ok || command.Parse == nil {
+		t.Fatal("onu-basic-info is not allow-listed with a parser")
+	}
+
+	parsed, err := command.Parse(basicInfoSample)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	rows := parsed.([]vsol.OnuIdentity)
+	if len(rows) != 3 {
+		t.Fatalf("rows = %d, want 3", len(rows))
+	}
+
+	first := rows[0]
+	if first.Pon != "0/1" || first.OnuID != 1 || first.Vendor != "MONU" || first.Model != "D301" {
+		t.Fatalf("identity = %+v", first)
+	}
+	if first.Type != "SFU" || first.InterfaceType != "1GE" {
+		t.Fatalf("type/interface = %+v", first)
+	}
+	if rows[2].InterfaceType != "1GE+CATV" {
+		t.Fatalf("interface with a plus = %q", rows[2].InterfaceType)
+	}
+}
+
+// The serial column must never survive parsing: it is a device identifier.
+func TestBasicInfoDoesNotKeepTheSerial(t *testing.T) {
+	command, _ := vsol.New().Command("onu-basic-info")
+	parsed, _ := command.Parse(basicInfoSample)
+	for _, row := range parsed.([]vsol.OnuIdentity) {
+		if strings.Contains(row.Vendor+row.Model+row.HardwareVer, "000000000000") {
+			t.Fatal("the serial column leaked into a parsed field")
+		}
 	}
 }
