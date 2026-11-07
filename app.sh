@@ -90,6 +90,19 @@ ensure_frontend_deps() {
   ok "frontend dependencies present"
 }
 
+# A go.work file above the checkout (commonly ~/go.work) makes every go command
+# in this single-module repo fail with "module ... is not one of the workspace
+# modules". Neutralise it for this script; GOWORK=off is set explicitly in the
+# environment first if the caller wants to keep it.
+neutralise_workspace() {
+  local work; work="$(go env GOWORK)"
+  if [ -n "$work" ]; then
+    warn "ignoring the Go workspace at $work (this repo is a single module)"
+    warn "to stop seeing this: rm -f \"$work\" \"$work.sum\"   — or run with GOWORK=off"
+    export GOWORK=off
+  fi
+}
+
 ensure_go_deps() {
   step "resolving Go modules"
   (cd "$ROOT" && go mod download) || die "go mod download failed"
@@ -99,6 +112,7 @@ ensure_go_deps() {
 if [ "$WANT_INSTALL_ONLY" = "1" ]; then
   step "installing dependencies only"
   ensure_go
+  neutralise_workspace
   ensure_node
   ensure_go_deps
   ensure_frontend_deps
@@ -190,6 +204,7 @@ mkdir -p "$LOG_DIR"
 
 # --- steps ----------------------------------------------------------------
 ensure_go
+neutralise_workspace
 ensure_node
 ensure_go_deps
 ensure_frontend_deps
