@@ -6,6 +6,7 @@
 #   ./app.sh --db            start/find a database, migrate, serve real data
 #   ./app.sh --db --seed     ... and replace its contents with the demo fixture
 #   ./app.sh --install       install dependencies, then exit
+#   ./app.sh --pglite        ignore DATABASE_URL and use PGlite anyway
 #   ./app.sh --no-install    never install anything, fail if something is missing
 #
 # Database resolution for --db, in order:
@@ -27,12 +28,14 @@ WANT_DB=0
 WANT_SEED=0
 WANT_INSTALL_ONLY=0
 ALLOW_INSTALL=1
+FORCE_PGLITE=0
 
 for arg in "$@"; do
   case "$arg" in
     --db) WANT_DB=1 ;;
     --seed) WANT_SEED=1 ;;
     --install) WANT_INSTALL_ONLY=1 ;;
+    --pglite) FORCE_PGLITE=1 ;;
     --no-install) ALLOW_INSTALL=0 ;;
     -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
@@ -143,13 +146,25 @@ ensure_secret_key() {
 PG_PID=""
 DSN_MODE="none"
 
-dsn_reachable() {
-  # A Go probe is reliable and does not depend on psql being installed.
+# Connects and applies migrations. Applying them here is a side effect, but an
+# idempotent one — and it means "the database is reachable" and "the schema is
+# current" are proven by the same call.
+db_ready() {
   (cd "$ROOT" && go run ./backend/cmd/migrate -dsn "$1" >/dev/null 2>&1)
 }
 
 resolve_database() {
-  if [ -n "${DATABASE_URL:-}" ]; then
+  if [ "$FORCE_PGLITE" != "1" ] && [ -n "${DATABASE_URL:-}" ]; then
+    step "checking DATABASE_URL"
+    if ! db_ready "$DATABASE_URL"; then
+      die "DATABASE_URL is set but nothing answers there:
+       ${DATABASE_URL}
+
+     pick one:
+       • start that database (pg_ctlcluster, docker, brew services…)
+       • unset DATABASE_URL      → this script starts PGlite instead
+       • ./app.sh --db --pglite  → ignore DATABASE_URL for this run"
+    fi
     DSN_MODE="external"
     return
   fi
@@ -159,7 +174,7 @@ resolve_database() {
     (cd "$ROOT/db" && docker compose up -d) || die "docker compose failed"
     DATABASE_URL="postgres://oltmon:oltmon@localhost:5432/oltmon?sslmode=disable"
     for _ in $(seq 1 30); do
-      dsn_reachable "$DATABASE_URL" && break
+      db_ready "$DATABASE_URL" && break
       sleep 1
     done
     DSN_MODE="docker"
@@ -179,7 +194,7 @@ resolve_database() {
       (exec 3<>"/dev/tcp/127.0.0.1/${port}") 2>/dev/null && { exec 3<&- 3>&-; break; }
       sleep 0.5
     done
-    dsn_reachable "$DATABASE_URL" || die "PGlite did not become reachable — see $LOG_DIR/pglite.log"
+    db_ready "$DATABASE_URL" || die "PGlite did not become reachable — see $LOG_DIR/pglite.log"
     DSN_MODE="pglite"
     warn "PGlite keeps data in memory: everything is gone when this script stops"
     return
