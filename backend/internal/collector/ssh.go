@@ -199,17 +199,23 @@ func (s *SSHSession) pagerOff(ctx context.Context) error {
 // means characters were dropped on the way in, and running the command anyway
 // would produce a result for the wrong command.
 func (s *SSHSession) awaitEcho(ctx context.Context, line string) error {
-	deadline := time.Now().Add(3 * time.Second)
+	// The window is the command timeout, not a fixed few seconds: `show onu
+	// opm-diag …` polls every ONU before printing anything, and a short window
+	// reports "no echo" for a command that is simply still running.
+	deadline := time.Now().Add(s.timeout)
 	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if strings.Contains(s.snapshot(), line) {
+
+		seen := s.snapshot()
+		// Echo arrived, or the command has already completed and returned the
+		// prompt — some CLIs swallow the echo of slow commands.
+		if strings.Contains(seen, line) || (seen != "" && s.prompt.MatchString(trimRight(seen))) {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			seen := s.snapshot()
-			return fmt.Errorf("device did not echo %q back (saw %q)", line, tail(seen, 80))
+			return fmt.Errorf("device did not echo %q back within %s (saw %q)", line, s.timeout, tail(seen, 80))
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
