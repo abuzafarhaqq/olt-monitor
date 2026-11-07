@@ -118,8 +118,13 @@ func main() {
 				exit(1, "enter configuration mode: %v", err)
 			}
 		}
+		// Probes clean up with backspaces and never press Enter, so the session
+		// stays in configuration mode. Re-sending "configure terminal" from
+		// inside config mode is rejected ("% Unknown command"), so it is not
+		// done here.
 		for _, probe := range adapter.Probes() {
-			output, err := session.Run(ctx, probe)
+			// Probe does not send CR: the '?' is answered without executing.
+			output, err := session.Probe(ctx, probe)
 			fmt.Printf("\n=== %s\n", probe)
 			if err != nil {
 				fmt.Printf("! %v\n", err)

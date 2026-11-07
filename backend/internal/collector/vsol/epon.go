@@ -36,7 +36,9 @@ func (Adapter) Probes() []string {
 		"show onu ?",
 		"show onu status ?",
 		"show onu opm-diag ?",
-		"show syslog ?",
+		// "show syslog ?" is deliberately absent: on this firmware it never
+		// answers and blocks the session until the timeout. The concrete
+		// command is tested directly instead.
 	}
 }
 
@@ -62,6 +64,9 @@ var commands = []collector.Command{
 	{ID: "onu-status-pon3", Line: "show onu status pon 3", Parse: parseOnuStatus},
 	{ID: "onu-status-pon4", Line: "show onu status pon 4", Parse: parseOnuStatus},
 	{ID: "opm-diag", Line: "show onu opm-diag all", Parse: parseOptical},
+	// Exists per `show onu ?` ("Specify onu basic information"). No parser yet:
+	// the output has not been captured.
+	{ID: "onu-basic-info", Line: "show onu basic-info all"},
 	{ID: "opm-diag-pon1", Line: "show onu opm-diag pon 1", Parse: parseOptical},
 	{ID: "opm-diag-pon2", Line: "show onu opm-diag pon 2", Parse: parseOptical},
 	{ID: "opm-diag-pon3", Line: "show onu opm-diag pon 3", Parse: parseOptical},

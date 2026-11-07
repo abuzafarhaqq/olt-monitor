@@ -346,6 +346,80 @@ func (s *SSHSession) Run(ctx context.Context, line string) (string, error) {
 	}
 }
 
+// Probe sends text ending in "?" WITHOUT a carriage return.
+//
+// On this CLI the CR is the Enter key: sending "show onu ?" plus CR would print
+// the option list and then execute "show onu". The question mark is answered as
+// it is typed, so the line is never submitted — it is discarded afterwards with
+// Ctrl-C, which aborts the pending input without running it.
+func (s *SSHSession) Probe(ctx context.Context, text string) (string, error) {
+	s.reset()
+	time.Sleep(150 * time.Millisecond)
+
+	if _, err := io.WriteString(s.stdin, text); err != nil {
+		return "", fmt.Errorf("write probe: %w", err)
+	}
+
+	// The CLI redraws the prompt with the half-typed line after the options, so
+	// waiting for a prompt is unreliable; wait for silence instead.
+	deadline := time.Now().Add(s.timeout)
+	last := ""
+	quiet := 0
+	pages := 0
+	for {
+		if ctx.Err() != nil {
+			return stripPager(s.snapshot()), ctx.Err()
+		}
+		current := s.snapshot()
+
+		// Option lists page too. A paging prompt is not silence: advance it.
+		if seen := strings.Count(current, "--More--"); seen > pages {
+			pages = seen
+			if pages > 200 {
+				return stripPager(current), fmt.Errorf("pager did not finish after %d pages", pages)
+			}
+			if _, err := io.WriteString(s.stdin, " "); err != nil {
+				return stripPager(current), err
+			}
+			last, quiet = current, 0
+			time.Sleep(80 * time.Millisecond)
+			continue
+		}
+
+		if current == last {
+			quiet++
+			if quiet >= 8 { // ~400 ms with no new bytes
+				break
+			}
+		} else {
+			last = current
+			quiet = 0
+		}
+		if time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	output := stripPager(s.snapshot())
+
+	// Abandon the pending line with backspaces, then Ctrl-U as a belt.
+	//
+	// Not Ctrl-C: on this CLI Ctrl-C leaves the configuration prompt entirely,
+	// so the next probe ran in privileged mode and answered "no matched
+	// command". Backspaces only edit the line that was never submitted.
+	s.reset()
+	if _, err := io.WriteString(s.stdin, strings.Repeat("\x08", len(text)+4)); err != nil {
+		return output, fmt.Errorf("clear pending line: %w", err)
+	}
+	if _, err := io.WriteString(s.stdin, "\x15"); err != nil {
+		return output, fmt.Errorf("kill pending line: %w", err)
+	}
+	_, _ = s.readUntil(ctx, s.prompt)
+
+	return strings.TrimSpace(output), nil
+}
+
 func (s *SSHSession) Close() error {
 	if s.session != nil {
 		_ = s.session.Close()
