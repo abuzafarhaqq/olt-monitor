@@ -9,7 +9,9 @@ import { runDiagnostic } from "./mockBackend";
  * changes. Keeping the decision in one constant is what stops a "temporary"
  * mock call from surviving into production in twelve different components.
  */
-export const USE_MOCK_API = true;
+// Driven by the environment so one script (app.sh) can start the same build in
+// either mode. VITE_USE_MOCK_API=false talks to the Go API.
+export const USE_MOCK_API = (import.meta.env.VITE_USE_MOCK_API ?? "true") !== "false";
 
 export async function executeDiagnostic(
   oltId: string,

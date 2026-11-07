@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/auth"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/secrets"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/auth"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/secrets"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store"
 )
 
 // WithDevices enables the write endpoints for the inventory.

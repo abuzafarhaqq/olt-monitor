@@ -12,9 +12,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/auth"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/secrets"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/auth"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/secrets"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store"
 )
 
 type Server struct {

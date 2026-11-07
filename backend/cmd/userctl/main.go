@@ -17,8 +17,8 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/auth"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/postgres"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/auth"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
 )
 
 func main() {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/domain"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/domain"
 )
 
 // User carries the password hash because the authentication path needs it.

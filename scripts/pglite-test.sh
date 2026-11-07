@@ -7,7 +7,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PORT="${PGLITE_PORT:-5433}"
+# A fixed port collides with a server left running by an interrupted run, which
+# then answers these tests with a stale database. Default to a random free-ish
+# port; PGLITE_PORT still overrides.
+PORT="${PGLITE_PORT:-$((5500 + RANDOM % 300))}"
 # simple_protocol: pgx's prepared-statement cache collides with pglite-socket's
 # single shared backend. Real Postgres does not need it.
 DSN="postgres://postgres@127.0.0.1:${PORT}/postgres?sslmode=disable&default_query_exec_mode=simple_protocol"
@@ -16,6 +19,13 @@ cd "$ROOT/tools/pglite"
 if [ ! -d node_modules ]; then
   echo "installing PGlite…"
   pnpm install --silent 2>/dev/null || npm install --silent
+fi
+
+# Fail loudly if something else already owns the port: a stale server would
+# answer the tests with its own database and produce confusing results.
+if (exec 3<>"/dev/tcp/127.0.0.1/${PORT}") 2>/dev/null; then
+  echo "port ${PORT} is already in use — stop that process or set PGLITE_PORT" >&2
+  exit 1
 fi
 
 PGLITE_PORT="$PORT" node server.mjs >/tmp/pglite-$$.log 2>&1 &

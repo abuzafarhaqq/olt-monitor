@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/auth"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/auth"
 )
 
 func TestHashAndVerify(t *testing.T) {

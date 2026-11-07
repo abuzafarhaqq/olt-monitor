@@ -1,4 +1,4 @@
-module github.com/abuzafarhaqq/olt-monitor-backend
+module github.com/abuzafarhaqq/olt-monitor
 
 go 1.22
 

@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/domain"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/postgres"
-	"github.com/abuzafarhaqq/olt-monitor-backend/migrations"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/domain"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
+	"github.com/abuzafarhaqq/olt-monitor/db"
 )
 
 // These tests need a real database:
@@ -34,7 +34,7 @@ func openStore(t *testing.T) *postgres.Store {
 	}
 	t.Cleanup(st.Close)
 
-	if err := postgres.Migrate(ctx, st.Pool(), migrations.FS); err != nil {
+	if err := postgres.Migrate(ctx, st.Pool(), db.FS); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	if err := postgres.Seed(ctx, st.Pool()); err != nil {

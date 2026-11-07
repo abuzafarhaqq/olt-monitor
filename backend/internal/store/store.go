@@ -9,7 +9,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/domain"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/domain"
 )
 
 // ErrNotFound is returned when a requested identifier does not exist. The HTTP

@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/api"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/auth"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/crypto"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/domain"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/secrets"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/postgres"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/api"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/auth"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/crypto"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/domain"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/secrets"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
 )
 
 func newKeyring(t *testing.T) *crypto.Keyring {

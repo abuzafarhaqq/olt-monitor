@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/domain"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/domain"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store"
 )
 
 type Store struct {

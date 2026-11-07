@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/api"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/domain"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/memory"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/api"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/domain"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/memory"
 )
 
 func newServer(t *testing.T) http.Handler {

@@ -14,8 +14,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/domain"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/domain"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store"
 )
 
 type Store struct {

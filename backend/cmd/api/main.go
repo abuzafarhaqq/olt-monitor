@@ -16,11 +16,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/api"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/crypto"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/secrets"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/memory"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/postgres"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/api"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/crypto"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/secrets"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/memory"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
 )
 
 func main() {

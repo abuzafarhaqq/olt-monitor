@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/api"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/auth"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/postgres"
-	"github.com/abuzafarhaqq/olt-monitor-backend/migrations"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/api"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/auth"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
+	"github.com/abuzafarhaqq/olt-monitor/db"
 )
 
 // Login needs a database: the in-memory fixture has no users, and inventing a
@@ -229,7 +229,7 @@ func openPostgres(t *testing.T, dsn string) *postgres.Store {
 		t.Fatalf("connect: %v", err)
 	}
 	t.Cleanup(st.Close)
-	if err := postgres.Migrate(ctx, st.Pool(), migrations.FS); err != nil {
+	if err := postgres.Migrate(ctx, st.Pool(), db.FS); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	return st

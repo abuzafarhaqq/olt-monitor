@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/auth"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/auth"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store"
 )
 
 // SessionCookieName is deliberately not "session": a generic name collides

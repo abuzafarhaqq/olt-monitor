@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/crypto"
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/postgres"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/crypto"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
 )
 
 // Backend is the narrow slice of storage this package needs.

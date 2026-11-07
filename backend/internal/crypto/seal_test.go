@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/crypto"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/crypto"
 )
 
 func newKeyring(t *testing.T) *crypto.Keyring {

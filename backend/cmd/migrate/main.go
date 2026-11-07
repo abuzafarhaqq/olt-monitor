@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/abuzafarhaqq/olt-monitor-backend/internal/store/postgres"
-	"github.com/abuzafarhaqq/olt-monitor-backend/migrations"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
+	"github.com/abuzafarhaqq/olt-monitor/db"
 )
 
 func main() {
@@ -33,7 +33,7 @@ func main() {
 	}
 	defer store.Close()
 
-	if err := postgres.Migrate(ctx, store.Pool(), migrations.FS); err != nil {
+	if err := postgres.Migrate(ctx, store.Pool(), db.FS); err != nil {
 		slog.Error("migrate", "error", err)
 		os.Exit(1)
 	}
