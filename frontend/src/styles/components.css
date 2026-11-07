@@ -1091,121 +1091,98 @@
   gap: var(--space-2);
 }
 
-/* Destructive actions ---------------------------------------------------- */
-
-.btn--danger {
-  border-color: var(--color-offline);
-  background: var(--color-offline);
-  color: #fff;
-}
-
-.card--danger {
-  border-color: var(--color-offline);
-}
-
-.card--danger .card__title {
-  color: var(--color-offline);
-}
-
-/* Wide tables scroll inside their card instead of breaking the page. */
-.table-scroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* ---- Tablet (≤1024px) ------------------------------------------------- */
-@media (max-width: 1024px) {
-  .dashboard-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .kpi-grid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  }
-}
-
-/* ---- Phone (≤640px) --------------------------------------------------- */
+/* ---- Phone: tables become cards (≤640px) ------------------------------
+ *
+ * Horizontal scroll is the minimum, not a solution: on a 360px screen a
+ * 9-column ONU table is unreadable. Below 640px each row becomes a labelled
+ * card, using data-label on the cells. This is the pattern that keeps priority
+ * fields visible without pinning columns.
+ */
 @media (max-width: 640px) {
-  .app-content {
-    padding: var(--space-3) var(--space-3) var(--space-8);
+  .table-scroll {
+    overflow: visible;
   }
 
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-2);
+  .card__body--flush {
+    padding: var(--space-2) var(--space-3) var(--space-3);
   }
 
-  .page-header__title {
-    font-size: var(--text-xl);
+  .data-table,
+  .data-table tbody,
+  .data-table tr,
+  .data-table td {
+    display: block;
+    width: 100%;
   }
 
-  .kpi-grid {
-    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
-    gap: var(--space-2);
-  }
-
-  .metric-card {
-    padding: var(--space-3);
-  }
-
-  .metric-card__value {
-    font-size: var(--text-xl);
-  }
-
-  /* Filters stack: side-by-side selects are unusable at this width. */
-  .filter-bar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-2);
-  }
-
-  .filter-field {
-    min-width: 0;
-  }
-
-  .form__grid,
-  .settings-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .form__row {
-    flex-direction: column;
-  }
-
-  .facts {
-    grid-template-columns: 1fr 1fr;
-    padding: var(--space-3);
-  }
-
-  .drawer {
-    width: 100vw;
-  }
-
-  .tabs {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-  }
-
-  .tabs__tab {
-    white-space: nowrap;
-  }
-
-  .matrix th:not(:first-child),
-  .matrix td:not(:first-child) {
-    width: 62px;
-    font-size: 0.625rem;
-  }
-
-  .topbar__search {
+  .data-table thead {
     display: none;
   }
 
-  .auth-card {
-    padding: var(--space-4);
+  .data-table tr {
+    margin-bottom: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
   }
 
-  .event-row {
-    grid-template-columns: 62px 1fr auto;
+  .data-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: 3px 0;
+    border: 0;
+    text-align: right;
+  }
+
+  .data-table td::before {
+    content: attr(data-label);
+    flex: 0 0 42%;
+    text-align: left;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  /* The first cell is the row's identity: give it room and drop the label. */
+  .data-table tr td:first-child {
+    display: block;
+    padding-bottom: var(--space-2);
+    margin-bottom: var(--space-1);
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+    font-size: var(--text-base);
+  }
+
+  .data-table tr td:first-child::before {
+    display: none;
+  }
+
+  .data-table .align-right {
+    text-align: right;
+  }
+
+  .matrix {
+    display: table;
+  }
+
+  .matrix thead {
+    display: table-header-group;
+  }
+
+  .matrix tbody,
+  .matrix tr,
+  .matrix td,
+  .matrix th {
+    display: table-cell;
+  }
+
+  .matrix tr {
+    padding: 0;
+    border: 0;
   }
 }

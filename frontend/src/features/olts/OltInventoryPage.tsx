@@ -5,6 +5,8 @@ import { DataTable, type Column } from "../../components/common/DataTable";
 import { FilterBar, Select, TextInput } from "../../components/common/FilterBar";
 import { FreshnessIndicator } from "../../components/common/FreshnessIndicator";
 import { PageHeader } from "../../components/common/PageHeader";
+import { CollectDrawer } from "./CollectDrawer";
+import { deleteOlt } from "../../services/oltApi";
 import { ErrorState, LoadingState } from "../../components/common/States";
 import { useOverview } from "../../hooks/useResource";
 import { USE_MOCK_API } from "../../services/client";
@@ -18,8 +20,11 @@ import {
 } from "./selectors";
 
 export function OltInventoryPage() {
-  const { data, loading, error } = useOverview();
+  const { data, loading, error, reload } = useOverview();
   const [filters, setFilters] = useState<OltFilters>(EMPTY_OLT_FILTERS);
+  const [collectFor, setCollectFor] = useState<OltRow | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (loading) return <LoadingState label="Loading devices…" />;
   if (data === null) return <ErrorState description={error ?? "No devices returned."} />;
@@ -85,16 +90,55 @@ export function OltInventoryPage() {
       key: "actions",
       header: "",
       align: "right",
-      render: ({ olt }) => (
-        <div className="row-actions">
-          <Link className="btn btn--small" to={`/olts/${olt.id}`}>
-            Open
-          </Link>
-          <Link className="btn btn--small" to={`/olts/${olt.id}/edit`}>
-            Edit
-          </Link>
-        </div>
-      ),
+      render: (row) => {
+        const { olt } = row;
+        if (confirmDelete === olt.id) {
+          return (
+            <div className="row-actions">
+              <button type="button" className="btn btn--small" onClick={() => setConfirmDelete(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn--small btn--danger"
+                onClick={async () => {
+                  setDeleteError(null);
+                  try {
+                    await deleteOlt(olt.id);
+                    setConfirmDelete(null);
+                    reload();
+                  } catch (caught) {
+                    setDeleteError(caught instanceof Error ? caught.message : "Could not delete");
+                  }
+                }}
+              >
+                Delete {olt.name}
+              </button>
+            </div>
+          );
+        }
+        return (
+          <div className="row-actions">
+            <button
+              type="button"
+              className="btn btn--small"
+              onClick={() => setCollectFor(row)}
+              title="Show the commands, then collect from this OLT"
+            >
+              Refresh
+            </button>
+            <Link className="btn btn--small" to={`/olts/${olt.id}`}>
+              Open
+            </Link>
+            <Link className="btn btn--small" to={`/olts/${olt.id}/edit`}>
+              Edit
+            </Link>
+            <button type="button" className="btn btn--small" onClick={() => setConfirmDelete(olt.id)}>
+              Delete
+            </button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -159,6 +203,20 @@ export function OltInventoryPage() {
         </div>
       </section>
 
+      {deleteError === null ? null : (
+        <p className="form__error" role="alert">
+          {deleteError}
+        </p>
+      )}
+
+      {collectFor === null ? null : (
+        <CollectDrawer
+          oltId={collectFor.olt.id}
+          oltName={collectFor.olt.name}
+          onClose={() => setCollectFor(null)}
+          onDone={reload}
+        />
+      )}
     </>
   );
 }

@@ -181,6 +181,15 @@ export interface Onu {
   /** Deregistrations in the last 24h — the evidence behind "flapping". */
   deregistrations24h: number;
   collectionStatus: CollectionStatus;
+
+  /** ONU vendor from basic-info (MONU, HWTC, ZTE…) — not the OLT's vendor. */
+  vendorId?: string;
+  onuType?: string;
+  interfaceType?: string;
+  identitySource?: "basic-info" | "status-only" | "unknown";
+  thresholdModel?: string;
+  /** false = only ever seen in the status table: an unprovisioned entry. */
+  provisioned?: boolean;
 }
 
 export type EventType =

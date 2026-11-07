@@ -36,9 +36,6 @@ export function DataTable<T>({
   }
 
   return (
-    // A wide diagnostic table scrolls inside its card instead of pushing the
-    // whole page sideways on a phone.
-    <div className="table-scroll">
     <table className="data-table">
       {caption ? <caption className="visually-hidden">{caption}</caption> : null}
       <thead>
@@ -60,6 +57,9 @@ export function DataTable<T>({
             {columns.map((column) => (
               <td
                 key={column.key}
+                // On a phone the header row is hidden and this label becomes the
+                // card's field name (see components.css).
+                data-label={column.header}
                 className={column.align === "right" ? "align-right tabular" : undefined}
               >
                 {column.render(row)}
@@ -69,6 +69,5 @@ export function DataTable<T>({
         ))}
       </tbody>
     </table>
-    </div>
   );
 }

@@ -22,7 +22,30 @@ export function OnuTable({ onus, olt, emptyMessage = "No ONU matches these filte
       render: (onu) => <span className="mono">{onu.onuId}</span>,
     },
     { key: "mac", header: "MAC", render: (onu) => <span className="mono">{onu.mac}</span> },
-    { key: "status", header: "Status", render: (onu) => <StatusBadge status={onu.status} /> },
+    {
+      key: "vendor",
+      header: "Vendor / model",
+      render: (onu) => (
+        <div>
+          {onu.vendorId ?? "—"}
+          <div className="cell-sub">{onu.model ?? "—"}</div>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (onu) =>
+        onu.provisioned === false ? (
+          // The device says "offline" for these; it has never registered, so a
+          // red Offline badge would report a fake outage on a healthy PON.
+          <span className="badge badge--unknown" title="never appeared in basic-info">
+            Unprovisioned
+          </span>
+        ) : (
+          <StatusBadge status={onu.status} />
+        ),
+    },
     {
       key: "optical",
       header: "Optical",

@@ -19,6 +19,65 @@ import {
   type OnuListFilters,
 } from "./selectors";
 
+interface VendorGroup {
+  vendor: string;
+  model: string;
+  total: number;
+  online: number;
+  unprovisioned: number;
+}
+
+/** One PON carries many vendors' ONUs, so the estate is summarised by model. */
+function groupByVendor(onus: Onu[]): VendorGroup[] {
+  const groups = new Map<string, VendorGroup>();
+  for (const onu of onus) {
+    const vendor = onu.vendorId ?? "unknown";
+    const model = onu.model ?? "unknown";
+    const key = `${vendor}/${model}`;
+    const group = groups.get(key) ?? { vendor, model, total: 0, online: 0, unprovisioned: 0 };
+    group.total += 1;
+    if (onu.status === "online" && onu.provisioned !== false) group.online += 1;
+    if (onu.provisioned === false) group.unprovisioned += 1;
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort((a, b) => b.total - a.total);
+}
+
+function VendorSummary({ onus }: { onus: Onu[] }) {
+  const groups = groupByVendor(onus);
+  const columns: Column<VendorGroup>[] = [
+    { key: "vendor", header: "Vendor", render: (g) => <span className="mono">{g.vendor}</span> },
+    { key: "model", header: "Model", render: (g) => g.model },
+    { key: "total", header: "ONUs", align: "right", render: (g) => g.total },
+    { key: "online", header: "Online", align: "right", render: (g) => g.online },
+    {
+      key: "unprovisioned",
+      header: "Unprovisioned",
+      align: "right",
+      render: (g) =>
+        g.unprovisioned > 0 ? <span className="cell-warning">{g.unprovisioned}</span> : 0,
+    },
+  ];
+
+  return (
+    <section className="card" aria-label="ONUs by vendor" style={{ marginBottom: "var(--space-4)" }}>
+      <div className="card__header">
+        <h2 className="card__title">ONUs by vendor and model</h2>
+        <span className="card__aside">{groups.length} combinations across the estate</span>
+      </div>
+      <div className="card__body card__body--flush">
+        <DataTable
+          columns={columns}
+          rows={groups}
+          getRowKey={(g) => `${g.vendor}/${g.model}`}
+          caption="ONUs by vendor"
+          emptyMessage="No ONU has been collected yet."
+        />
+      </div>
+    </section>
+  );
+}
+
 export function OnuListPage() {
   const { data, loading, error } = useOverview();
   const [filters, setFilters] = useState<OnuListFilters>(EMPTY_ONU_LIST_FILTERS);
@@ -136,6 +195,8 @@ export function OnuListPage() {
           tone="info"
         />
       </section>
+
+      <VendorSummary onus={data.onus} />
 
       <section className="card" aria-label="ONUs">
         <div className="card__body">

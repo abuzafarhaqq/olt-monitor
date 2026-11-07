@@ -66,3 +66,31 @@ export async function deleteOlt(id: string): Promise<void> {
   if (USE_MOCK_API) throw new Error(MOCK_WRITE_ERROR);
   await request<void>(`/olts/${id}`, { method: "DELETE" });
 }
+
+export interface CollectionPlan {
+  adapter: string;
+  commands: string[];
+  lines: string[];
+}
+
+export interface CollectionResult {
+  runId: number;
+  plan: CollectionPlan;
+  stored: boolean;
+  tookMs: number;
+}
+
+/** The exact commands a refresh would run — shown before anything is dialled. */
+export async function getCollectionPlan(id: string): Promise<CollectionPlan> {
+  if (USE_MOCK_API) {
+    throw new Error("Refresh needs the API (set USE_MOCK_API = false).");
+  }
+  return request<CollectionPlan>(`/olts/${id}/collection-plan`);
+}
+
+export async function collectNow(id: string): Promise<CollectionResult> {
+  if (USE_MOCK_API) {
+    throw new Error("Refresh needs the API (set USE_MOCK_API = false).");
+  }
+  return request<CollectionResult>(`/olts/${id}/collect`, { method: "POST", timeoutMs: 150_000 });
+}

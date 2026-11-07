@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/api"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/collecting"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/crypto"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/secrets"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/memory"
@@ -52,6 +53,8 @@ func main() {
 		logger.Info("connected to postgres")
 		server := api.NewServer(pg, logger).WithAuth(pg).WithAudit(pg).WithDevices(pg).WithUsers(pg)
 
+		var creds *secrets.Service
+
 		// Credential storage needs a key. Without one the endpoints answer 503
 		// rather than storing device passwords in the clear.
 		key, keyErr := crypto.KeyFromEnv("OLT_SECRETS_KEY")
@@ -63,9 +66,23 @@ func main() {
 				logger.Error("credential key invalid", "error", ringErr)
 				os.Exit(1)
 			}
-			server = server.WithSecrets(secrets.New(ring, pg))
+			creds = secrets.New(ring, pg)
+			server = server.WithSecrets(creds)
 			logger.Info("credential storage enabled")
 		}
+
+		// Collection service: the UI's "refresh" button ends here.
+		collectSvc := &collecting.Service{
+			Pool:       pg.Pool(),
+			CLIPass:    os.Getenv("OLT_CLI_PASSWORD"),
+			EnablePass: os.Getenv("OLT_ENABLE_PASSWORD"),
+			AllowRun:   os.Getenv("OLT_ALLOW_COLLECT") != "false",
+			Timeout:    90 * time.Second,
+		}
+		if creds != nil {
+			collectSvc.Secrets = creds
+		}
+		server = server.WithCollector(collectSvc)
 
 		handler = server.Routes()
 	}

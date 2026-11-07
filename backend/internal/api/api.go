@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/auth"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/collecting"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/secrets"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store"
 )
@@ -23,6 +24,7 @@ type Server struct {
 	audit     store.AuditStore
 	devices   store.DeviceStore
 	users     store.UserStore
+	collector *collecting.Service
 	secrets   *secrets.Service
 	log       *slog.Logger
 	heartbeat time.Duration
@@ -71,6 +73,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/olts/{id}/credential", s.guard(auth.PermDeviceRead, s.getCredentialMeta))
 	mux.HandleFunc("DELETE /api/v1/olts/{id}/credential", s.guard(auth.PermDeviceManage, s.deleteCredential))
 	mux.HandleFunc("DELETE /api/v1/olts/{id}", s.guard(auth.PermDeviceManage, s.deleteOlt))
+
+	// Collection from the UI: the plan is readable by anyone who may read
+	// diagnostics, running it needs the run permission.
+	mux.HandleFunc("GET /api/v1/olts/{id}/collection-plan", s.guard(auth.PermDiagnosticsRead, s.collectionPlan))
+	mux.HandleFunc("POST /api/v1/olts/{id}/collect", s.guard(auth.PermDiagnosticsRun, s.collectOlt))
 
 	mux.HandleFunc("GET /api/v1/users", s.guard(auth.PermUsersManage, s.listUsers))
 	mux.HandleFunc("POST /api/v1/users", s.guard(auth.PermUsersManage, s.createUser))
