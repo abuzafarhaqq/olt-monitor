@@ -1,0 +1,75 @@
+/*
+ * Design tokens.
+ *
+ * Every colour, space and radius in the app comes from a variable declared
+ * here. Components never hard-code a hex value. That is what makes the whole
+ * UI re-skinnable — and what keeps status colours consistent: green always
+ * means the same thing because there is exactly one green.
+ */
+
+:root {
+  /* Surfaces */
+  --color-bg-app: #f4f6fa;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+
+  /* Text */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-text-inverse: #f8fafc;
+
+  /* Sidebar — dark navy per §3 */
+  --color-sidebar-bg: #0e1a2b;
+  --color-sidebar-bg-raised: #16283f;
+  --color-sidebar-bg-active: #1e3a5f;
+  --color-sidebar-text: #c2cedd;
+  --color-sidebar-text-muted: #7d8ea3;
+  --color-sidebar-border: #1c2c42;
+
+  /* Status — meanings fixed by §3 */
+  --color-online: #15803d;
+  --color-online-soft: #dcfce7;
+  --color-offline: #b91c1c;
+  --color-offline-soft: #fee2e2;
+  --color-warning: #b45309;
+  --color-warning-soft: #fef3c7;
+  --color-info: #1d4ed8;
+  --color-info-soft: #dbeafe;
+  --color-unknown: #64748b;
+  --color-unknown-soft: #e2e8f0;
+  --color-investigating: #6d28d9;
+  --color-investigating-soft: #ede9fe;
+
+  /* Typography */
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.625rem;
+
+  /* Spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Shape */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+
+  /* Layout */
+  --sidebar-width: 236px;
+  --topbar-height: 56px;
+}
