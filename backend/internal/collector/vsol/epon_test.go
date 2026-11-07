@@ -6,19 +6,23 @@ import (
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/collector/vsol"
 )
 
-// The samples below follow the shape described in the device discovery notes.
-// They are NOT captures from the real OLT: the parsers must be re-run against a
-// real `show onu status all` before anyone trusts the numbers.
+// Fixtures are copied from a real `ssh admin@<olt>` session.
+//
+// MAC addresses are replaced with locally-administered values (02:…) and the
+// OLT serial number is removed: this repository is public, and neither belongs
+// in an example. Everything else — column widths, N/A markers, the 2000 clock —
+// is exactly as the device printed it.
 
-const versionSample = `        VSOL EPON OLT
-Hardware Version : V1.1.4
-Software Version : V2.03.75R_231213152618
-Build Date       : 2023-12-13
+const versionSample = `  Olt Serial Number:           REDACTED
+  Olt Device Model:            EPON-OLT
+  Hardware Version:            V1.1.4
+  Software Version:            V2.03.75R_231213152618
+  Software Created Time:       Wed, 13 Dec 2023 15:26:18 +0800
+  Copyright 2016-2023
 `
 
 func TestParseVersion(t *testing.T) {
-	adapter := vsol.New()
-	command, ok := adapter.Command("version")
+	command, ok := vsol.New().Command("version")
 	if !ok {
 		t.Fatal("version is not allow-listed")
 	}
@@ -28,6 +32,9 @@ func TestParseVersion(t *testing.T) {
 		t.Fatalf("parse: %v", err)
 	}
 	version := parsed.(vsol.Version)
+	if version.Model != "EPON-OLT" {
+		t.Fatalf("model = %q", version.Model)
+	}
 	if version.Hardware != "V1.1.4" {
 		t.Fatalf("hardware = %q", version.Hardware)
 	}
@@ -36,31 +43,42 @@ func TestParseVersion(t *testing.T) {
 	}
 }
 
-const timeSample = `Current time : 2000-05-20 04:12:33
-Uptime       : 41 days, 0 hours, 12 minutes
+// The real device says "The current date/time is : Sun Jun 4 14:50:12 2000"
+// while its uptime says 34 days. The parser must read both and refuse to call
+// that clock trusted.
+const timeSample = `The current date/time is : Sun Jun  4 14:50:12 2000
+
+The olt has been running for 34 days 8 hours 49 minutes 30 seconds
 `
 
-// A clock from 2000 is unusable, and the parser has to say so rather than pass
-// it along as if it were a real timestamp.
-func TestClockIsFlaggedUntrusted(t *testing.T) {
+func TestClockIsReadAndFlaggedUntrusted(t *testing.T) {
 	command, _ := vsol.New().Command("time")
 	parsed, err := command.Parse(timeSample)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	if parsed.(vsol.Clock).Trusted {
+
+	clock := parsed.(vsol.Clock)
+	if clock.DeviceTime != "Sun Jun  4 14:50:12 2000" {
+		t.Fatalf("device time = %q", clock.DeviceTime)
+	}
+	if clock.Uptime != "34 days 8 hours 49 minutes 30 seconds" {
+		t.Fatalf("uptime = %q", clock.Uptime)
+	}
+	if clock.Trusted {
 		t.Fatal("a year-2000 clock was marked trusted")
 	}
 }
 
-const statusSample = `PON   ONU  MAC                Status   Distance(m)
-0/1   1    02:1A:2B:00:00:01  online   420
-0/1   2    02:1A:2B:00:00:02  online   1180
-0/2   6    02:1A:2B:00:00:06  offline  --
-0/2   7    02:1A:2B:00:00:07  LOS      --
+const statusSample = `ONU-ID      Status    MAC  Address         Distance(m)  RTT(TQ) LastRegTime             LastDeregTime           LastDeregReason    AliveTime    Upgrade
+------      ------    ------------         -----------  ------  -----------             -------------           ---------------   ------------ -------
+EPON0/1:1   online    02:00:00:00:00:01    2469         1602    2000/05/30 11:24:09     2000/05/30 11:12:11     Power Off         4 03:25:58   N/A
+EPON0/1:2   offline   02:00:00:00:00:02    0            0       N/A                     N/A                     N/A               00:00:00     N/A
+EPON0/1:4   offline   02:00:00:00:00:04    542          427     2000/06/03 06:43:08     2000/06/03 09:48:16     Wire Down         03:05:07     N/A
+EPON0/1:16  online    02:00:00:00:00:16    569          443     2000/04/30 06:01:34     N/A                     N/A               34 08:48:33  N/A
 `
 
-func TestParseOnuStatus(t *testing.T) {
+func TestParseOnuStatusFromRealOutput(t *testing.T) {
 	command, _ := vsol.New().Command("onu-status")
 	parsed, err := command.Parse(statusSample)
 	if err != nil {
@@ -69,59 +87,61 @@ func TestParseOnuStatus(t *testing.T) {
 
 	rows := parsed.([]vsol.OnuRow)
 	if len(rows) != 4 {
-		t.Fatalf("rows = %d, want 4", len(rows))
-	}
-	if rows[0].Pon != "0/1" || rows[0].OnuID != 1 || rows[0].Status != "online" {
-		t.Fatalf("first row = %+v", rows[0])
-	}
-	if rows[0].Distance == nil || *rows[0].Distance != 420 {
-		t.Fatalf("distance = %v", rows[0].Distance)
-	}
-	if rows[2].Status != "offline" {
-		t.Fatalf("third row status = %q", rows[2].Status)
-	}
-	if rows[2].Distance != nil {
-		t.Fatalf("an unknown distance became %d", *rows[2].Distance)
-	}
-	// LOS maps to offline: the ONU is unreachable, whatever the vendor calls it.
-	if rows[3].Status != "offline" {
-		t.Fatalf("LOS mapped to %q", rows[3].Status)
-	}
-}
-
-const opticalSample = `PON   ONU  RX(dBm)  TX(dBm)
-0/1   1    -18.40   2.41
-0/1   2    -31.40   2.38
-0/2   6    --       --
-`
-
-func TestParseOpticalKeepsMissingAsNil(t *testing.T) {
-	command, _ := vsol.New().Command("opm-diag")
-	parsed, err := command.Parse(opticalSample)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
+		t.Fatalf("rows = %d, want 4 (header and separator must not match)", len(rows))
 	}
 
-	rows := parsed.([]vsol.OpticalRow)
-	if len(rows) != 3 {
-		t.Fatalf("rows = %d, want 3", len(rows))
+	first := rows[0]
+	if first.Pon != "0/1" || first.OnuID != 1 || first.Status != "online" {
+		t.Fatalf("first row = %+v", first)
 	}
-	if rows[1].RxDbm == nil || *rows[1].RxDbm != -31.4 {
-		t.Fatalf("critical reading = %v", rows[1].RxDbm)
+	if first.MAC != "02:00:00:00:00:01" {
+		t.Fatalf("mac = %q", first.MAC)
 	}
-	if rows[2].RxDbm != nil {
-		t.Fatalf(`"--" became %v instead of nil`, *rows[2].RxDbm)
+	if first.Distance == nil || *first.Distance != 2469 {
+		t.Fatalf("distance = %v", first.Distance)
+	}
+	if first.LastRegTime != "2000/05/30 11:24:09" {
+		t.Fatalf("last register = %q", first.LastRegTime)
+	}
+
+	// A dead ONU reports distance 0. Zero metres is not a measurement.
+	if rows[1].Distance != nil {
+		t.Fatalf("distance 0 became %d", *rows[1].Distance)
+	}
+	if rows[1].LastRegTime != "" {
+		t.Fatalf("N/A became %q", rows[1].LastRegTime)
+	}
+
+	// Wire Down is still an offline ONU with a real distance.
+	if rows[2].Status != "offline" || rows[2].Distance == nil || *rows[2].Distance != 542 {
+		t.Fatalf("third row = %+v", rows[2])
+	}
+
+	// Two-digit ONU ids and a missing deregistration must both survive.
+	if rows[3].OnuID != 16 || rows[3].LastDeregTime != "" {
+		t.Fatalf("fourth row = %+v", rows[3])
 	}
 }
 
 func TestUnrecognisedOutputIsAnError(t *testing.T) {
 	command, _ := vsol.New().Command("onu-status")
-	if _, err := command.Parse("error: permission denied"); err == nil {
+	if _, err := command.Parse("% Error: permission denied"); err == nil {
 		t.Fatal("garbage parsed as if it were a table")
 	}
 }
 
-// The allow-list is the security boundary: an unknown id must not resolve.
+// opm-diag is allow-listed but has no parser until its output is captured: raw
+// evidence only, never a guess.
+func TestOpticalCommandIsRawUntilCaptured(t *testing.T) {
+	command, ok := vsol.New().Command("opm-diag")
+	if !ok {
+		t.Fatal("opm-diag should stay allow-listed")
+	}
+	if command.Parse != nil {
+		t.Fatal("opm-diag has a parser that was written without a real sample")
+	}
+}
+
 func TestOnlyAllowListedCommandsResolve(t *testing.T) {
 	adapter := vsol.New()
 	if _, ok := adapter.Command("shell"); ok {

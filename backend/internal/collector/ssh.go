@@ -19,10 +19,18 @@ import (
 // purpose: the design permits it only for legacy devices on an isolated network,
 // and nothing should make that easy by accident.
 type SSHConfig struct {
-	Host       string
-	Port       int
-	User       string
-	Password   string
+	Host     string
+	Port     int
+	User     string
+	Password string
+
+	// This device logs in three times: SSH, then a character-mode CLI login
+	// ("Login:" / "Password:"), then "enable" asks for a third secret. All three
+	// are separate credentials and must be supplied separately.
+	CLIUser        string
+	CLIPassword    string
+	EnablePassword string
+
 	Timeout    time.Duration
 	KnownHosts string
 	// Prompt marks the end of a command's output. An EPON CLI is character mode,
@@ -40,6 +48,10 @@ type SSHSession struct {
 	stdin   io.WriteCloser
 	prompt  *regexp.Regexp
 	timeout time.Duration
+
+	cliUser        string
+	cliPassword    string
+	enablePassword string
 
 	mu     sync.Mutex
 	buffer bytes.Buffer
@@ -104,7 +116,10 @@ func DialSSH(ctx context.Context, cfg SSHConfig) (*SSHSession, error) {
 		return nil, fmt.Errorf("stdin: %w", err)
 	}
 
-	s := &SSHSession{client: client, session: session, stdin: stdin, timeout: timeout}
+	s := &SSHSession{
+		client: client, session: session, stdin: stdin, timeout: timeout,
+		cliUser: cfg.CLIUser, cliPassword: cfg.CLIPassword, enablePassword: cfg.EnablePassword,
+	}
 	if cfg.Prompt != nil {
 		s.prompt = cfg.Prompt
 	} else {
@@ -119,7 +134,83 @@ func DialSSH(ctx context.Context, cfg SSHConfig) (*SSHSession, error) {
 		_ = client.Close()
 		return nil, fmt.Errorf("shell: %w", err)
 	}
+	if err := s.login(ctx); err != nil {
+		_ = s.Close()
+		return nil, err
+	}
 	return s, nil
+}
+
+// login walks the prompts the device actually shows: a character-mode login,
+// then privileged mode. Each step waits for its prompt with the same timeout as
+// a command, so a device that never answers fails instead of hanging.
+func (s *SSHSession) login(ctx context.Context) error {
+	if s.cliUser != "" {
+		if err := s.answer(ctx, regexp.MustCompile(`(?i)login\s*:\s*$`), s.cliUser); err != nil {
+			return fmt.Errorf("cli login prompt: %w", err)
+		}
+		if err := s.answer(ctx, regexp.MustCompile(`(?i)password\s*:\s*$`), s.cliPassword); err != nil {
+			return fmt.Errorf("cli password prompt: %w", err)
+		}
+	}
+
+	// User mode prompt.
+	if _, err := s.readUntil(ctx, regexp.MustCompile(`[#>]\s*$`)); err != nil {
+		return fmt.Errorf("user-mode prompt: %w", err)
+	}
+
+	if s.enablePassword != "" {
+		s.reset()
+		if _, err := io.WriteString(s.stdin, "enable\r"); err != nil {
+			return fmt.Errorf("enable: %w", err)
+		}
+		if err := s.answer(ctx, regexp.MustCompile(`(?i)password\s*:\s*$`), s.enablePassword); err != nil {
+			return fmt.Errorf("enable password prompt: %w", err)
+		}
+		if _, err := s.readUntil(ctx, regexp.MustCompile(`#\s*$`)); err != nil {
+			return fmt.Errorf("privileged prompt: %w", err)
+		}
+	}
+	return nil
+}
+
+// answer waits for a prompt and replies with one line.
+func (s *SSHSession) answer(ctx context.Context, prompt *regexp.Regexp, value string) error {
+	if _, err := s.readUntil(ctx, prompt); err != nil {
+		return err
+	}
+	s.reset()
+	if _, err := io.WriteString(s.stdin, value+"\r"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// readUntil blocks until the accumulated output matches, the context ends or
+// the timeout expires. It returns whatever was seen, so a caller can put it in
+// an error message that is worth reading.
+func (s *SSHSession) readUntil(ctx context.Context, match *regexp.Regexp) (string, error) {
+	deadline := time.Now().Add(s.timeout)
+	for {
+		if ctx.Err() != nil {
+			return s.snapshot(), ctx.Err()
+		}
+		output := s.snapshot()
+		if match.MatchString(trimRight(output)) {
+			return output, nil
+		}
+		if time.Now().After(deadline) {
+			return output, fmt.Errorf("timed out after %s; last output: %q", s.timeout, tail(output, 120))
+		}
+		time.Sleep(80 * time.Millisecond)
+	}
+}
+
+func tail(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[len(s)-n:]
 }
 
 type lockedWriter struct{ session *SSHSession }

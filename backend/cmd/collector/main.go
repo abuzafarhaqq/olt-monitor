@@ -1,8 +1,14 @@
 // Command collector runs allow-listed read-only commands against one OLT.
 //
-// Dry by default: without -confirm it prints exactly what it would run and
-// exits. Dialling a production OLT is a deliberate per-run act, and the output
-// is evidence — both halves of that are enforced here, not promised in a README.
+// This device (VSOL EPON) asks for credentials three times: SSH auth, then a
+// character-mode CLI login ("Login:" / "Password:"), then "enable" for
+// privileged mode. All three secrets come from the environment:
+//
+//	OLT_PASSWORD          ssh password
+//	OLT_CLI_PASSWORD      the CLI login password (pass -cli-user to enable)
+//	OLT_ENABLE_PASSWORD   the enable secret (privileged mode)
+//
+// Dry by default: without -confirm it prints what it would do and exits.
 package main
 
 import (
@@ -30,6 +36,7 @@ func main() {
 	adapterName := flag.String("adapter", "vsol-epon", "vendor adapter")
 	commandList := flag.String("commands", "version,time", "comma-separated ids from the adapter allow-list")
 	knownHosts := flag.String("known-hosts", "", "known_hosts file used to verify the device key")
+	cliUser := flag.String("cli-user", "", "character-mode CLI login (the device asks again after SSH)")
 	timeout := flag.Duration("timeout", 20*time.Second, "per-command timeout")
 	confirm := flag.Bool("confirm", false, "actually connect; without it this prints the plan and exits")
 	acceptKey := flag.Bool("accept-key", false, "trust-on-first-use: record the device key and exit")
@@ -51,6 +58,11 @@ func main() {
 	}
 
 	fmt.Printf("adapter : %s\n", adapter.Name())
+	if *cliUser != "" {
+		fmt.Println("login   : ssh → CLI login → enable (three prompts; secrets from env)")
+	} else {
+		fmt.Println("login   : ssh only (-cli-user not given; enable password not used)")
+	}
 	fmt.Printf("device  : %s:%d (user %q)\n", *host, *port, *user)
 	fmt.Printf("commands:\n%s\n", strings.Join(plan, "\n"))
 
@@ -78,12 +90,18 @@ func main() {
 	if password == "" {
 		exit(2, "OLT_PASSWORD is not set (never a flag: it would land in shell history)")
 	}
+	cliPassword := os.Getenv("OLT_CLI_PASSWORD")
+	enablePassword := os.Getenv("OLT_ENABLE_PASSWORD")
+	if *cliUser != "" && cliPassword == "" {
+		exit(2, "OLT_CLI_PASSWORD is not set but -cli-user was given")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout*time.Duration(len(ids)+2))
 	defer cancel()
 
 	session, err := collector.DialSSH(ctx, collector.SSHConfig{
 		Host: *host, Port: *port, User: *user, Password: password,
+		CLIUser: *cliUser, CLIPassword: cliPassword, EnablePassword: enablePassword,
 		Timeout: *timeout, KnownHosts: *knownHosts,
 	})
 	if err != nil {
