@@ -88,6 +88,36 @@ The top bar shows the signed-in user, their role and a sign-out button; the role
 switcher is gone. Permissions come from the session, and no session means no
 permissions — `can()` returns false when there is no user.
 
+## Data source
+
+Every page reads through `services/data.ts`, which has two implementations with
+the same signature. `USE_MOCK_API` in `services/client.ts` picks one, so the
+whole estate flips together instead of one component at a time.
+
+| `USE_MOCK_API` | Reads | Writes |
+|---|---|---|
+| `true` (default) | fixtures in `src/mock` | refused: "needs the API" |
+| `false` | `GET /api/v1/...` | `POST/PATCH/PUT` with the session cookie |
+
+Running against the backend:
+
+```bash
+# terminal 1 — the API
+cd ../olt-monitor-backend && go run ./cmd/api -addr :8080
+
+# terminal 2 — the SPA (proxy already maps /api → :8080)
+pnpm dev
+```
+
+Set `USE_MOCK_API = false` to use it. `configureBaseUrl()` in `services/api.ts`
+points the SPA at another host when the proxy is not in play.
+
+Pages show `MOCK DATA` in the header only while mock mode is on — the flag now
+follows the data source instead of being hard-coded.
+
+Still fixture-backed even with the API on: incidents, reports, optical
+diagnostics, collection health, and the ONU optical history / raw evidence tabs.
+
 ## Adding and editing a device
 
 `/olts/new` and `/olts/:oltId/edit` share one form: identity, management access,

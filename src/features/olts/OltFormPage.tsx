@@ -2,7 +2,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "../../components/common/PageHeader";
 import { PermissionGate } from "../../components/common/PermissionGate";
-import { MOCK_OVERVIEW } from "../../mock/mockData";
+import { LoadingState } from "../../components/common/States";
+import { useResource } from "../../hooks/useResource";
+import { dataSource } from "../../services/data";
 import {
   WRITES_AVAILABLE,
   createOlt,
@@ -12,6 +14,7 @@ import {
   type CredentialMeta,
   type OltInput,
 } from "../../services/oltApi";
+import type { Olt } from "../../types/domain";
 import { formatDateTime } from "../../utils/format";
 
 interface FormState extends OltInput {
@@ -61,23 +64,28 @@ export function OltFormPage() {
   const navigate = useNavigate();
   const isEdit = oltId !== undefined;
 
-  const existing = isEdit ? MOCK_OVERVIEW.olts.find((olt) => olt.id === oltId) : undefined;
-
-  const [form, setForm] = useState<FormState>(() =>
-    existing === undefined
-      ? EMPTY
-      : {
-          ...EMPTY,
-          name: existing.name,
-          vendor: existing.vendor,
-          model: existing.model,
-          technology: existing.technology,
-          managementAddress: existing.managementAddress,
-          managementPort: 22,
-          connection: existing.connection,
-          enabled: true,
-        },
+  const { data: existing, loading: loadingDevice } = useResource<Olt | null>(
+    () => (isEdit && oltId !== undefined ? dataSource.olt(oltId) : Promise.resolve(null)),
+    [isEdit, oltId],
   );
+
+  const [form, setForm] = useState<FormState>(EMPTY);
+
+  // The form starts empty and is filled when the device arrives. Prefilling from
+  // a fixture instead would show stale values the moment the API disagrees.
+  useEffect(() => {
+    if (existing === null) return;
+    setForm({
+      ...EMPTY,
+      name: existing.name,
+      vendor: existing.vendor,
+      model: existing.model,
+      technology: existing.technology,
+      managementAddress: existing.managementAddress,
+      connection: existing.connection,
+      enabled: true,
+    });
+  }, [existing]);
   const [meta, setMeta] = useState<CredentialMeta | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -134,7 +142,11 @@ export function OltFormPage() {
     }
   };
 
-  if (isEdit && existing === undefined) {
+  if (isEdit && loadingDevice) {
+    return <LoadingState label="Loading device…" />;
+  }
+
+  if (isEdit && existing === null) {
     return (
       <>
         <PageHeader title="OLT not found" subtitle={`No device with id ${oltId ?? "(none)"}`} />

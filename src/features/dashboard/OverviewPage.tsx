@@ -1,7 +1,9 @@
 import { AvailabilityTrendChart } from "../../components/charts/AvailabilityTrendChart";
 import { MetricCard } from "../../components/common/MetricCard";
 import { PageHeader } from "../../components/common/PageHeader";
-import { MOCK_OVERVIEW } from "../../mock/mockData";
+import { ErrorState, LoadingState } from "../../components/common/States";
+import { useOverview } from "../../hooks/useResource";
+import { USE_MOCK_API } from "../../services/client";
 import { formatRelative } from "../../utils/format";
 import { OltHealthTable } from "./OltHealthTable";
 import { ProblemPons } from "./ProblemPons";
@@ -14,7 +16,11 @@ import { getKpis, getRecentEvents, getTopProblemPons } from "./selectors";
  * Stage 2 only has to replace the data source, not the page.
  */
 export function OverviewPage() {
-  const data = MOCK_OVERVIEW;
+  const { data, loading, error } = useOverview();
+
+  if (loading) return <LoadingState label="Loading overview…" />;
+  if (data === null) return <ErrorState description={error ?? "The overview returned no data."} />;
+
   const kpis = getKpis(data);
   const events = getRecentEvents(data.events, 6);
   const problems = getTopProblemPons(data, 4);
@@ -24,7 +30,7 @@ export function OverviewPage() {
       <PageHeader
         title="Network Overview"
         subtitle={`Snapshot generated ${formatRelative(data.generatedAt)} · ${kpis.totalOlts} OLTs · ${kpis.totalOnus} ONUs`}
-        isMock
+        isMock={USE_MOCK_API}
       />
 
       <section className="kpi-grid" aria-label="Key metrics">

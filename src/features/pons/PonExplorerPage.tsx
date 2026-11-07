@@ -5,7 +5,9 @@ import { FreshnessIndicator } from "../../components/common/FreshnessIndicator";
 import { MetricCard } from "../../components/common/MetricCard";
 import { PageHeader } from "../../components/common/PageHeader";
 import { EmptyState } from "../../components/common/States";
-import { MOCK_OVERVIEW } from "../../mock/mockData";
+import { ErrorState, LoadingState } from "../../components/common/States";
+import { useOverview } from "../../hooks/useResource";
+import { USE_MOCK_API } from "../../services/client";
 import { OnuTable } from "../onus/OnuTable";
 import {
   EMPTY_ONU_FILTERS,
@@ -17,19 +19,24 @@ import {
 } from "./selectors";
 
 export function PonExplorerPage() {
-  const data = MOCK_OVERVIEW;
-  const branches = getTree(data);
-
-  const [selectedPonId, setSelectedPonId] = useState<string>(data.pons[0]?.id ?? "");
+  const { data, loading, error } = useOverview();
+  // Empty means "not chosen yet": the first PON is picked once data arrives,
+  // because at mount there is nothing to pick from.
+  const [selectedPonId, setSelectedPonId] = useState<string>("");
   const [filters, setFilters] = useState<OnuFilters>(EMPTY_ONU_FILTERS);
 
-  const pon = data.pons.find((candidate) => candidate.id === selectedPonId);
+  if (loading) return <LoadingState label="Loading PONs…" />;
+  if (data === null) return <ErrorState description={error ?? "No PON data."} />;
+
+  const branches = getTree(data);
+  const activePonId = selectedPonId === "" ? (data.pons[0]?.id ?? "") : selectedPonId;
+  const pon = data.pons.find((candidate) => candidate.id === activePonId);
   const olt = data.olts.find((candidate) => candidate.id === pon?.oltId);
 
   if (pon === undefined || olt === undefined) {
     return (
       <>
-        <PageHeader title="PON Explorer" subtitle="No PON selected" isMock />
+        <PageHeader title="PON Explorer" subtitle="No PON selected" isMock={USE_MOCK_API} />
         <EmptyState title="Nothing to show" description="No PON port is known to the platform." />
       </>
     );
@@ -45,7 +52,7 @@ export function PonExplorerPage() {
       <PageHeader
         title="PON Explorer"
         subtitle="OLT → PON port → ONU. Port names come from each adapter."
-        isMock
+        isMock={USE_MOCK_API}
       />
 
       <div className="explorer">

@@ -6,7 +6,9 @@ import { MetricCard } from "../../components/common/MetricCard";
 import { OpticalBadge } from "../../components/common/OpticalBadge";
 import { PageHeader } from "../../components/common/PageHeader";
 import { StatusBadge } from "../../components/common/StatusBadge";
-import { MOCK_OVERVIEW } from "../../mock/mockData";
+import { ErrorState, LoadingState } from "../../components/common/States";
+import { useOverview } from "../../hooks/useResource";
+import { USE_MOCK_API } from "../../services/client";
 import type { Onu } from "../../types/domain";
 import { formatDistance, formatDbm, formatRelative } from "../../utils/format";
 import {
@@ -18,10 +20,13 @@ import {
 } from "./selectors";
 
 export function OnuListPage() {
-  const data = MOCK_OVERVIEW;
-  const olts = getOltMap(data);
+  const { data, loading, error } = useOverview();
   const [filters, setFilters] = useState<OnuListFilters>(EMPTY_ONU_LIST_FILTERS);
 
+  if (loading) return <LoadingState label="Loading ONUs…" />;
+  if (data === null) return <ErrorState description={error ?? "No ONU data."} />;
+
+  const olts = getOltMap(data);
   const visible = filterOnus(data, filters);
   const ponOptions = data.pons.filter(
     (pon) => filters.oltId === "" || pon.oltId === filters.oltId,
@@ -103,7 +108,7 @@ export function OnuListPage() {
       <PageHeader
         title="ONU Management"
         subtitle={`${data.onus.length} ONUs across ${data.olts.length} OLTs`}
-        isMock
+        isMock={USE_MOCK_API}
       />
 
       <section className="kpi-grid" aria-label="ONU metrics">

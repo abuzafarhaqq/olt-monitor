@@ -7,7 +7,9 @@ import { FreshnessIndicator } from "../../components/common/FreshnessIndicator";
 import { MetricCard } from "../../components/common/MetricCard";
 import { PageHeader } from "../../components/common/PageHeader";
 import { Tabs } from "../../components/common/Tabs";
-import { MOCK_OVERVIEW } from "../../mock/mockData";
+import { ErrorState, LoadingState } from "../../components/common/States";
+import { useOverview } from "../../hooks/useResource";
+import { USE_MOCK_API } from "../../services/client";
 import { RecentEvents } from "../dashboard/RecentEvents";
 import { OnuTable } from "../onus/OnuTable";
 import type { Olt, Pon } from "../../types/domain";
@@ -59,8 +61,11 @@ function ponColumns(): Column<Pon>[] {
 
 export function OltDetailPage() {
   const { oltId } = useParams<{ oltId: string }>();
-  const data = MOCK_OVERVIEW;
+  const { data, loading, error } = useOverview();
   const [activeTab, setActiveTab] = useState("overview");
+
+  if (loading) return <LoadingState label="Loading device…" />;
+  if (data === null) return <ErrorState description={error ?? "No device data."} />;
 
   const olt: Olt | undefined = data.olts.find((candidate) => candidate.id === oltId);
 
@@ -93,7 +98,7 @@ export function OltDetailPage() {
       <PageHeader
         title={olt.name}
         subtitle={`${olt.vendor} ${olt.model} · ${olt.technology} · ${olt.managementAddress} · ${olt.connection.toUpperCase()}`}
-        isMock
+        isMock={USE_MOCK_API}
         actions={
           <Link className="btn btn--small" to="/olts">
             ← OLT Inventory

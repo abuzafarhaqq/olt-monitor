@@ -5,7 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    // Stage 2 will proxy REST + SSE to the Go API here.
-    // proxy: { "/api": { target: "http://127.0.0.1:8080", changeOrigin: true } },
+    // Same-origin in dev, so the session cookie works without CORS: the browser
+    // talks to :5173, Vite forwards /api to the Go server.
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8080",
+        changeOrigin: false,
+      },
+    },
   },
 });

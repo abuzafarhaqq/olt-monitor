@@ -5,7 +5,9 @@ import { DataTable, type Column } from "../../components/common/DataTable";
 import { FilterBar, Select, TextInput } from "../../components/common/FilterBar";
 import { FreshnessIndicator } from "../../components/common/FreshnessIndicator";
 import { PageHeader } from "../../components/common/PageHeader";
-import { MOCK_OVERVIEW } from "../../mock/mockData";
+import { ErrorState, LoadingState } from "../../components/common/States";
+import { useOverview } from "../../hooks/useResource";
+import { USE_MOCK_API } from "../../services/client";
 import { formatCount } from "../../utils/format";
 import {
   EMPTY_OLT_FILTERS,
@@ -16,9 +18,13 @@ import {
 } from "./selectors";
 
 export function OltInventoryPage() {
-  const data = MOCK_OVERVIEW;
-  const rows = getOltRows(data);
+  const { data, loading, error } = useOverview();
   const [filters, setFilters] = useState<OltFilters>(EMPTY_OLT_FILTERS);
+
+  if (loading) return <LoadingState label="Loading devices…" />;
+  if (data === null) return <ErrorState description={error ?? "No devices returned."} />;
+
+  const rows = getOltRows(data);
 
   const visible = filterOltRows(rows, filters);
 
@@ -97,7 +103,7 @@ export function OltInventoryPage() {
       <PageHeader
         title="OLT Inventory"
         subtitle={`${rows.length} devices · ${data.olts.filter((olt) => olt.reachable).length} reachable`}
-        isMock
+        isMock={USE_MOCK_API}
         actions={
           <Link className="btn btn--primary" to="/olts/new">
             Add OLT

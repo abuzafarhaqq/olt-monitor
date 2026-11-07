@@ -18,7 +18,17 @@ import type {
   Pon,
 } from "../types/domain";
 
-const BASE_URL = import.meta.env.VITE_API_BASE ?? "/api/v1";
+// Mutable so a deployment (or a test) can point the SPA at another host
+// without a rebuild.
+let baseUrl: string = import.meta.env.VITE_API_BASE ?? "/api/v1";
+
+export function configureBaseUrl(url: string): void {
+  baseUrl = url.replace(/\/$/, "");
+}
+
+export function currentBaseUrl(): string {
+  return baseUrl;
+}
 
 export type ApiErrorKind = "network" | "timeout" | "http" | "parse" | "unauthorized";
 
@@ -55,7 +65,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   let response: Response;
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
+    response = await fetch(`${baseUrl}${path}`, {
       method,
       signal: controller.signal,
       headers: {

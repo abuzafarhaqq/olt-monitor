@@ -13,7 +13,9 @@ import { StatusBadge } from "../../components/common/StatusBadge";
 import { Tabs } from "../../components/common/Tabs";
 import { classifyRx, findThreshold } from "../../constants/opticalThresholds";
 import { ONU_DIAGNOSTICS } from "../../mock/onuDiagnostics";
-import { MOCK_OVERVIEW } from "../../mock/mockData";
+import { ErrorState, LoadingState } from "../../components/common/States";
+import { useOverview } from "../../hooks/useResource";
+import { USE_MOCK_API } from "../../services/client";
 import type { OpticalHistoryPoint } from "../../types/domain";
 import { formatDateTime, formatDistance, formatDbm } from "../../utils/format";
 import { RecentEvents } from "../dashboard/RecentEvents";
@@ -30,7 +32,10 @@ const TABS = [
 export function OnuDetailPage() {
   const { onuId } = useParams<{ onuId: string }>();
   const [activeTab, setActiveTab] = useState("overview");
-  const data = MOCK_OVERVIEW;
+  const { data, loading, error } = useOverview();
+
+  if (loading) return <LoadingState label="Loading ONU…" />;
+  if (data === null) return <ErrorState description={error ?? "No ONU data."} />;
 
   const onu = data.onus.find((candidate) => candidate.id === onuId);
   const olt = data.olts.find((candidate) => candidate.id === onu?.oltId);
@@ -85,7 +90,7 @@ export function OnuDetailPage() {
       <PageHeader
         title={`ONU ${onu.onuId} · ${onu.mac}`}
         subtitle={`${olt.name} · ${pon?.name ?? onu.ponId} · ${onu.vendor} ${onu.model}`}
-        isMock
+        isMock={USE_MOCK_API}
         actions={
           <Link className="btn btn--small" to="/onus">
             ← ONU Management
