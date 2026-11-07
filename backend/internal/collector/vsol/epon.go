@@ -42,7 +42,17 @@ var commands = []collector.Command{
 	{ID: "version", Line: "show version", Parse: parseVersion},
 	{ID: "time", Line: "show time", Parse: parseTime},
 	{ID: "onu-status", Line: "show onu status all", Parse: parseOnuStatus},
+	// Per-port forms, generated over a fixed range: still an allow-list, still
+	// no free text reaching the device, but small enough to read once.
+	{ID: "onu-status-pon1", Line: "show onu status pon 1", Parse: parseOnuStatus},
+	{ID: "onu-status-pon2", Line: "show onu status pon 2", Parse: parseOnuStatus},
+	{ID: "onu-status-pon3", Line: "show onu status pon 3", Parse: parseOnuStatus},
+	{ID: "onu-status-pon4", Line: "show onu status pon 4", Parse: parseOnuStatus},
 	{ID: "opm-diag", Line: "show onu opm-diag all", Parse: parseOptical},
+	{ID: "opm-diag-pon1", Line: "show onu opm-diag pon 1", Parse: parseOptical},
+	{ID: "opm-diag-pon2", Line: "show onu opm-diag pon 2", Parse: parseOptical},
+	{ID: "opm-diag-pon3", Line: "show onu opm-diag pon 3", Parse: parseOptical},
+	{ID: "opm-diag-pon4", Line: "show onu opm-diag pon 4", Parse: parseOptical},
 }
 
 // --- version -------------------------------------------------------------

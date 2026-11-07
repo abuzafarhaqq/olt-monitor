@@ -171,6 +171,26 @@ func (s *SSHSession) login(ctx context.Context) error {
 		if _, err := s.readUntil(ctx, regexp.MustCompile(`#\s*$`)); err != nil {
 			return fmt.Errorf("privileged prompt: %w", err)
 		}
+
+		// Long tables are paged with "--More--", which stalls a scripted reader
+		// forever. Ask for no pager; if this device rejects the syntax the
+		// command fails harmlessly and Run() pages manually instead.
+		_ = s.pagerOff(ctx)
+	}
+	return nil
+}
+
+// pagerOff tries the two usual incantations and ignores the result. Failing is
+// expected on devices that do not support it; Run() copes either way.
+func (s *SSHSession) pagerOff(ctx context.Context) error {
+	for _, line := range []string{"terminal length 0", "terminal datadump"} {
+		s.reset()
+		if _, err := io.WriteString(s.stdin, line+"\r"); err != nil {
+			return err
+		}
+		if _, err := s.readUntil(ctx, regexp.MustCompile(`[#>]\s*$`)); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -227,6 +247,16 @@ func (s *SSHSession) readUntil(ctx context.Context, match *regexp.Regexp) (strin
 	}
 }
 
+// stripPager removes the paging markers and the control characters that arrive
+// with them, so a parser sees a continuous table.
+func stripPager(s string) string {
+	s = strings.ReplaceAll(s, " --More-- ", "")
+	s = strings.ReplaceAll(s, "--More--", "")
+	s = strings.ReplaceAll(s, "\x00", "")
+	s = strings.ReplaceAll(s, "\x08", "")
+	return s
+}
+
 func tail(s string, n int) string {
 	if len(s) <= n {
 		return s
@@ -275,19 +305,36 @@ func (s *SSHSession) Run(ctx context.Context, line string) (string, error) {
 	}
 
 	deadline := time.Now().Add(s.timeout)
+	pages := 0
+
 	for {
 		if ctx.Err() != nil {
-			return s.snapshot(), ctx.Err()
-		}
-		if time.Now().After(deadline) {
-			// Timeout is a result, not a crash: the partial output is evidence.
-			return s.snapshot(), fmt.Errorf("timed out after %s waiting for the prompt", s.timeout)
+			return stripPager(s.snapshot()), ctx.Err()
 		}
 
 		output := s.snapshot()
-		if trimmed := trimRight(output); s.prompt.MatchString(trimmed) && trimmed != "" {
+
+		// A paging prompt is not a finished command: advance it. Without this a
+		// 135-row table stalls until the timeout and yields one truncated page.
+		if seen := strings.Count(output, "--More--"); seen > pages {
+			pages = seen
+			if pages > 500 {
+				return stripPager(output), fmt.Errorf("pager did not finish after %d pages", pages)
+			}
+			if _, err := io.WriteString(s.stdin, " "); err != nil {
+				return stripPager(output), fmt.Errorf("advance pager: %w", err)
+			}
+		}
+
+		if time.Now().After(deadline) {
+			// Timeout is a result, not a crash: the partial output is evidence.
+			return stripPager(output), fmt.Errorf("timed out after %s waiting for the prompt", s.timeout)
+		}
+
+		trimmed := trimRight(output)
+		if s.prompt.MatchString(trimmed) && trimmed != "" && !strings.HasSuffix(trimmed, "--More--") {
 			// Drop the echoed command and the trailing prompt.
-			return stripEcho(trimmed, line), nil
+			return stripEcho(stripPager(trimmed), line), nil
 		}
 		time.Sleep(80 * time.Millisecond)
 	}
@@ -307,17 +354,17 @@ func trimRight(s string) string {
 	return string(bytes.TrimRight([]byte(s), " \t\r\n"))
 }
 
-// stripEcho removes the echoed command line and the trailing prompt, so callers
+// promptLine matches a real device prompt as a whole line: "epon-olt#",
+// "epon-olt(config)#", "switch>". The earlier version only accepted prompts of
+// three characters or fewer, so "epon-olt(config)#" stayed in the evidence.
+var promptLine = regexp.MustCompile(`(?m)^[A-Za-z0-9._\-()/]*[#>]\s*$`)
+
+// stripEcho removes the echoed command and the trailing prompt(s), so callers
 // see the device's answer and nothing else.
 func stripEcho(output, line string) string {
 	if len(output) >= len(line) && output[:len(line)] == line {
 		output = output[len(line):]
 	}
-	if index := bytes.LastIndexByte([]byte(output), '\n'); index >= 0 {
-		tail := output[index+1:]
-		if bytes.ContainsAny([]byte(tail), "#>") && len(bytes.TrimSpace([]byte(tail))) <= 3 {
-			output = output[:index]
-		}
-	}
+	output = promptLine.ReplaceAllString(output, "")
 	return string(bytes.TrimSpace([]byte(output)))
 }

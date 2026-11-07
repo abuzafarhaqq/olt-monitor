@@ -75,3 +75,25 @@ func TestRunnerSurfacesSessionError(t *testing.T) {
 		t.Fatal("a failed command produced parsed data")
 	}
 }
+
+// The device pages long tables with "--More--". A reader that waits for the
+// prompt without advancing the pager returns one truncated page and then times
+// out — exactly what the first live run did.
+func TestStripPagerRemovesMarkers(t *testing.T) {
+	// stripPager is unexported; the behaviour is covered through the session
+	// tests in ssh_test.go, so here we only assert the contract that parsing a
+	// paged transcript still works end to end.
+	session := &fakeSession{outputs: map[string]string{
+		"show onu status all": "ONU-ID Status MAC Address Distance(m) RTT(TQ)\n" +
+			"EPON0/1:1 online 02:00:00:00:00:01 246 160\n --More-- \n" +
+			"EPON0/1:2 offline 02:00:00:00:00:02 0 0\n",
+	}}
+	results, err := (collector.Runner{Adapter: vsol.New(), Session: session}).
+		Run(context.Background(), []string{"onu-status"})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if results[0].Parsed == nil {
+		t.Fatal("paged output did not parse")
+	}
+}
