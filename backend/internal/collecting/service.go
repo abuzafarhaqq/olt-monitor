@@ -28,6 +28,11 @@ type Service struct {
 	CLIPass    string
 	EnablePass string
 
+	// KnownHosts verifies the device key. Empty means every connection is
+	// refused — the same rule the CLI has, and the reason this failed the first
+	// time it ran from the API.
+	KnownHosts string
+
 	// AllowRun is the safety switch: false means "report the plan, dial nothing".
 	AllowRun bool
 	Timeout  time.Duration
@@ -120,6 +125,7 @@ func (s Service) Run(ctx context.Context, device Device) (Plan, int64, error) {
 		CLIPassword:    firstNonEmpty(s.CLIPass, password),
 		EnablePassword: firstNonEmpty(s.EnablePass, password),
 		Timeout:        20 * time.Second,
+		KnownHosts:     s.KnownHosts,
 	})
 	if err != nil {
 		return plan, 0, fmt.Errorf("connect: %w", err)

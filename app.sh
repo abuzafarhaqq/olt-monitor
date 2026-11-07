@@ -241,6 +241,9 @@ if [ "$WANT_DB" = "1" ]; then
   (cd "$ROOT" && go run ./backend/cmd/migrate "${MIGRATE_ARGS[@]}") || die "migration failed"
 
   BACKEND_ARGS+=(-dsn "$DATABASE_URL")
+  # Absolute: the API worker inherits this to verify device keys, so the
+  # Refresh button in the UI can dial the same devices the CLI does.
+  export OLT_KNOWN_HOSTS="$ROOT/.secrets/known_hosts"
   export VITE_USE_MOCK_API=false
 else
   step "mock mode: the frontend serves fixtures and the API uses its in-memory data"

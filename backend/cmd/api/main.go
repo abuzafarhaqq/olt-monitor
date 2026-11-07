@@ -24,6 +24,15 @@ import (
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
 )
 
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	dsn := flag.String("dsn", os.Getenv("DATABASE_URL"), "Postgres DSN; empty = in-memory fixture")
@@ -77,6 +86,9 @@ func main() {
 			CLIPass:    os.Getenv("OLT_CLI_PASSWORD"),
 			EnablePass: os.Getenv("OLT_ENABLE_PASSWORD"),
 			AllowRun:   os.Getenv("OLT_ALLOW_COLLECT") != "false",
+			// Same file the CLI records keys into. Without it every collection
+			// refuses to dial, which is what the first UI refresh hit.
+			KnownHosts: firstNonEmpty(os.Getenv("OLT_KNOWN_HOSTS"), ".secrets/known_hosts"),
 			Timeout:    90 * time.Second,
 		}
 		if creds != nil {
