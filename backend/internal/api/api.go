@@ -25,6 +25,7 @@ type Server struct {
 	devices   store.DeviceStore
 	users     store.UserStore
 	collector *collecting.Service
+	logs      LogStore
 	secrets   *secrets.Service
 	log       *slog.Logger
 	heartbeat time.Duration
@@ -78,6 +79,9 @@ func (s *Server) Routes() http.Handler {
 	// diagnostics, running it needs the run permission.
 	mux.HandleFunc("GET /api/v1/olts/{id}/collection-plan", s.guard(auth.PermDiagnosticsRead, s.collectionPlan))
 	mux.HandleFunc("POST /api/v1/olts/{id}/collect", s.guard(auth.PermDiagnosticsRun, s.collectOlt))
+
+	mux.HandleFunc("GET /api/v1/collection/runs", s.guard(auth.PermDiagnosticsRead, s.listRuns))
+	mux.HandleFunc("GET /api/v1/collection/runs/{id}", s.guard(auth.PermDiagnosticsRead, s.runDetail))
 
 	mux.HandleFunc("GET /api/v1/users", s.guard(auth.PermUsersManage, s.listUsers))
 	mux.HandleFunc("POST /api/v1/users", s.guard(auth.PermUsersManage, s.createUser))

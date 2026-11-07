@@ -34,6 +34,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { path: "/optical", label: "Optical Diagnostics", stage: 4, built: true },
       { path: "/reports", label: "History & Reports", stage: 6, built: true },
       { path: "/collection", label: "Collection Health", stage: 2, built: true },
+      { path: "/logs", label: "Logs", stage: 8, built: true },
     ],
   },
   {

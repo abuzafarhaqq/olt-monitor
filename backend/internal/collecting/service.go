@@ -50,6 +50,16 @@ type Device struct {
 	Connection        string
 }
 
+// CommandResult is one executed command, for the UI and the log page.
+type CommandResult struct {
+	ID      string `json:"id"`
+	Line    string `json:"line"`
+	OK      bool   `json:"ok"`
+	Error   string `json:"error,omitempty"`
+	Summary string `json:"summary,omitempty"`
+	Raw     string `json:"raw,omitempty"`
+}
+
 // Plan is the command list a run would execute. The UI shows it before anything
 // is dialled — that is why it is a separate call.
 type Plan struct {
@@ -94,21 +104,21 @@ func (s Service) BuildPlan(device Device) (Plan, error) {
 }
 
 // Run executes the plan and ingests the result in one transaction.
-func (s Service) Run(ctx context.Context, device Device) (Plan, int64, error) {
+func (s Service) Run(ctx context.Context, device Device) (Plan, int64, []CommandResult, error) {
 	plan, err := s.BuildPlan(device)
 	if err != nil {
-		return plan, 0, err
+		return plan, 0, nil, err
 	}
 	if !s.AllowRun {
-		return plan, 0, fmt.Errorf("collection is disabled on this server")
+		return plan, 0, nil, fmt.Errorf("collection is disabled on this server")
 	}
 	if s.Secrets == nil {
-		return plan, 0, fmt.Errorf("secret storage is not configured")
+		return plan, 0, nil, fmt.Errorf("secret storage is not configured")
 	}
 
 	username, password, err := s.Secrets.Resolve(ctx, device.ID)
 	if err != nil {
-		return plan, 0, fmt.Errorf("credential for %s: %w", device.Name, err)
+		return plan, 0, nil, fmt.Errorf("credential for %s: %w", device.Name, err)
 	}
 
 	timeout := s.Timeout
@@ -128,24 +138,35 @@ func (s Service) Run(ctx context.Context, device Device) (Plan, int64, error) {
 		KnownHosts:     s.KnownHosts,
 	})
 	if err != nil {
-		return plan, 0, fmt.Errorf("connect: %w", err)
+		return plan, 0, nil, fmt.Errorf("connect: %w", err)
 	}
 	defer session.Close()
 
 	adapter, _, err := AdapterFor(device.Vendor)
 	if err != nil {
-		return plan, 0, err
+		return plan, 0, nil, err
 	}
 	if adapter.RequiresConfigMode() {
 		if _, err := session.Run(dialCtx, "configure terminal"); err != nil {
-			return plan, 0, fmt.Errorf("enter configuration mode: %w", err)
+			return plan, 0, nil, fmt.Errorf("enter configuration mode: %w", err)
 		}
 	}
 
 	started := time.Now().UTC()
 	results, err := collector.Runner{Adapter: adapter, Session: session}.Run(dialCtx, plan.Commands)
 	if err != nil {
-		return plan, 0, err
+		return plan, 0, nil, err
+	}
+
+	out := make([]CommandResult, 0, len(results))
+	for _, result := range results {
+		entry := CommandResult{ID: result.CommandID, Line: result.Line, OK: result.Err == nil, Raw: result.Raw}
+		if result.Err != nil {
+			entry.Error = result.Err.Error()
+		} else {
+			entry.Summary = summarise(result.Parsed)
+		}
+		out = append(out, entry)
 	}
 
 	ing := collector.Ingest{Pool: s.Pool, ParserVersion: plan.Adapter + "@0.4"}
@@ -168,7 +189,31 @@ func (s Service) Run(ctx context.Context, device Device) (Plan, int64, error) {
 	}
 
 	runID, err := ing.Save(ctx, run)
-	return plan, runID, err
+	return plan, runID, out, err
+}
+
+// summarise is what the drawer shows per command: counts, not a wall of text.
+func summarise(parsed any) string {
+	switch rows := parsed.(type) {
+	case []vsol.OnuRow:
+		online := 0
+		for _, row := range rows {
+			if row.Status == "online" {
+				online++
+			}
+		}
+		return fmt.Sprintf("%d ONUs, %d online", len(rows), online)
+	case []vsol.OnuIdentity:
+		return fmt.Sprintf("%d ONUs with identity", len(rows))
+	case []vsol.OpticalRow:
+		return fmt.Sprintf("%d optical readings", len(rows))
+	case vsol.Version:
+		return fmt.Sprintf("%s %s / %s", rows.Model, rows.Hardware, rows.Software)
+	case vsol.Clock:
+		return fmt.Sprintf("device clock %q (trusted: %v)", rows.DeviceTime, rows.Trusted)
+	default:
+		return ""
+	}
 }
 
 func firstNonEmpty(values ...string) string {

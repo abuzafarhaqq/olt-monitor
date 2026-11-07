@@ -8,6 +8,7 @@ import { CollectionHealthPage } from "../features/collection/CollectionHealthPag
 import { DiagnosticsConsolePage } from "../features/console/DiagnosticsConsolePage";
 import { OverviewPage } from "../features/dashboard/OverviewPage";
 import { IncidentsPage } from "../features/incidents/IncidentsPage";
+import { LogsPage } from "../features/logs/LogsPage";
 import { OltDetailPage } from "../features/olts/OltDetailPage";
 import { OltFormPage } from "../features/olts/OltFormPage";
 import { OltInventoryPage } from "../features/olts/OltInventoryPage";
@@ -30,6 +31,7 @@ const BUILT_PATHS = new Set([
   "/incidents",
   "/reports",
   "/collection",
+  "/logs",
   "/console",
   "/users",
   "/settings",
@@ -66,6 +68,7 @@ export function AppRouter() {
           <Route path="/incidents" element={<IncidentsPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/collection" element={<CollectionHealthPage />} />
+          <Route path="/logs" element={<LogsPage />} />
           <Route path="/console" element={<DiagnosticsConsolePage />} />
           <Route path="/users" element={<UsersAccessPage />} />
           <Route path="/settings" element={<SettingsPage />} />

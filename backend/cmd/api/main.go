@@ -94,7 +94,7 @@ func main() {
 		if creds != nil {
 			collectSvc.Secrets = creds
 		}
-		server = server.WithCollector(collectSvc)
+		server = server.WithCollector(collectSvc).WithLogs(pg)
 
 		handler = server.Routes()
 	}

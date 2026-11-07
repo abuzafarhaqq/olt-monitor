@@ -113,6 +113,26 @@ export function CollectDrawer({ oltId, oltName, onClose, onDone }: CollectDrawer
             {result.plan.commands.length} commands executed on {oltName}. Raw output is kept as
             evidence for every one of them.
           </p>
+
+          <ul className="command-results">
+            {result.results.map((command) => (
+              <li key={command.id} className="command-result">
+                <div className="command-result__head">
+                  <span className={`badge ${command.ok ? "badge--online" : "badge--offline"}`}>
+                    {command.ok ? "ok" : "failed"}
+                  </span>
+                  <code className="mono">{command.line}</code>
+                  <span className="cell-sub">{command.summary ?? command.error ?? ""}</span>
+                </div>
+                {command.raw === undefined || command.raw === "" ? null : (
+                  <details className="command-result__raw">
+                    <summary>output</summary>
+                    <pre className="raw__pre">{command.raw}</pre>
+                  </details>
+                )}
+              </li>
+            ))}
+          </ul>
         </>
       )}
 

@@ -73,9 +73,19 @@ export interface CollectionPlan {
   lines: string[];
 }
 
+export interface CommandResult {
+  id: string;
+  line: string;
+  ok: boolean;
+  error?: string;
+  summary?: string;
+  raw?: string;
+}
+
 export interface CollectionResult {
   runId: number;
   plan: CollectionPlan;
+  results: CommandResult[];
   stored: boolean;
   tookMs: number;
 }

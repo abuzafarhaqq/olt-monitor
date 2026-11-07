@@ -1186,3 +1186,40 @@
     border: 0;
   }
 }
+
+/* Collection results ---------------------------------------------------- */
+
+.command-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.command-result {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+}
+
+.command-result__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+}
+
+.command-result__raw summary {
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--color-info);
+  padding: var(--space-1) 0;
+}
+
+.command-result__raw .raw__pre {
+  max-height: 260px;
+  margin-top: var(--space-2);
+}
