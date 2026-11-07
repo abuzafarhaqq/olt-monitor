@@ -23,6 +23,10 @@ func (Adapter) Name() string { return "vsol-epon" }
 
 func (a Adapter) Commands() []collector.Command { return commands }
 
+// RequiresConfigMode is true: these commands are only accepted at
+// `epon-olt(config)#`. In privileged mode the device answers "% Unknown command".
+func (Adapter) RequiresConfigMode() bool { return true }
+
 func (a Adapter) Command(id string) (collector.Command, bool) {
 	for _, command := range commands {
 		if command.ID == id {

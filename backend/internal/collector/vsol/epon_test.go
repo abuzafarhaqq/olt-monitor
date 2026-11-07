@@ -190,3 +190,12 @@ func TestOpticalRejectsGarbage(t *testing.T) {
 		t.Fatal("garbage parsed as optical rows")
 	}
 }
+
+// The whole `show onu …` family is rejected in privileged mode: the device
+// answers "% Unknown command" there. The adapter has to say so, or the
+// collector runs every command one mode too low.
+func TestAdapterRequiresConfigMode(t *testing.T) {
+	if !vsol.New().RequiresConfigMode() {
+		t.Fatal("vsol-epon must declare config mode; its show commands live there")
+	}
+}

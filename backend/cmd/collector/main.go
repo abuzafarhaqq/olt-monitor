@@ -109,6 +109,14 @@ func main() {
 	}
 	defer session.Close()
 
+	if adapter.RequiresConfigMode() {
+		// Entering the configuration prompt is required for `show onu …`; no
+		// configuration command is ever sent from here.
+		if _, err := session.Run(ctx, "configure terminal"); err != nil {
+			exit(1, "enter configuration mode: %v", err)
+		}
+	}
+
 	results, err := collector.Runner{Adapter: adapter, Session: session}.Run(ctx, ids)
 	if err != nil {
 		exit(1, "run: %v", err)

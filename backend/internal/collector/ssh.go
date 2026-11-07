@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -103,7 +104,7 @@ func DialSSH(ctx context.Context, cfg SSHConfig) (*SSHSession, error) {
 	}
 
 	// A PTY is required: the CLI will not print tables without one.
-	if err := session.RequestPty("vt100", 60, 200, ssh.TerminalModes{ssh.ECHO: 0}); err != nil {
+	if err := session.RequestPty("vt100", 60, 200, ssh.TerminalModes{}); err != nil {
 		_ = session.Close()
 		_ = client.Close()
 		return nil, fmt.Errorf("pty: %w", err)
@@ -174,6 +175,26 @@ func (s *SSHSession) login(ctx context.Context) error {
 	return nil
 }
 
+// awaitEcho waits until the device echoes the whole line back. A partial echo
+// means characters were dropped on the way in, and running the command anyway
+// would produce a result for the wrong command.
+func (s *SSHSession) awaitEcho(ctx context.Context, line string) error {
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if strings.Contains(s.snapshot(), line) {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			seen := s.snapshot()
+			return fmt.Errorf("device did not echo %q back (saw %q)", line, tail(seen, 80))
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 // answer waits for a prompt and replies with one line.
 func (s *SSHSession) answer(ctx context.Context, prompt *regexp.Regexp, value string) error {
 	if _, err := s.readUntil(ctx, prompt); err != nil {
@@ -240,8 +261,17 @@ func (s *SSHSession) reset() {
 func (s *SSHSession) Run(ctx context.Context, line string) (string, error) {
 	s.reset()
 
+	// A character-mode CLI loses leading characters if the line arrives while it
+	// is still settling after the previous prompt. A short pause plus an echo
+	// check is what makes this reliable, and the check is what turns a silent
+	// "Unknown command" into a diagnostic.
+	time.Sleep(150 * time.Millisecond)
 	if _, err := io.WriteString(s.stdin, line+"\r"); err != nil {
 		return "", fmt.Errorf("write command: %w", err)
+	}
+
+	if err := s.awaitEcho(ctx, line); err != nil {
+		return s.snapshot(), err
 	}
 
 	deadline := time.Now().Add(s.timeout)

@@ -36,6 +36,10 @@ type Adapter interface {
 	Commands() []Command
 	// Command finds one by id.
 	Command(id string) (Command, bool)
+	// RequiresConfigMode reports whether the commands only exist inside the
+	// configuration prompt. On the VSOL EPON the whole `show onu …` family is
+	// rejected in privileged mode with "% Unknown command".
+	RequiresConfigMode() bool
 }
 
 // Session is the transport. The collector only ever sees this interface, so a
