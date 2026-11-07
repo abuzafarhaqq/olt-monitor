@@ -41,6 +41,8 @@ func main() {
 	confirm := flag.Bool("confirm", false, "actually connect; without it this prints the plan and exits")
 	acceptKey := flag.Bool("accept-key", false, "trust-on-first-use: record the device key and exit")
 	discover := flag.Bool("discover", false, "ask the CLI with '?' what it supports, print the answers, run nothing")
+	dsn := flag.String("dsn", os.Getenv("DATABASE_URL"), "store this run in Postgres (empty = print only)")
+	oltID := flag.String("olt-id", "", "database id of this OLT, required with -dsn")
 	flag.Parse()
 
 	adapter, err := resolveAdapter(*adapterName)
@@ -142,9 +144,20 @@ func main() {
 		}
 	}
 
+	startedAt := time.Now().UTC()
 	results, err := collector.Runner{Adapter: adapter, Session: session}.Run(ctx, ids)
 	if err != nil {
 		exit(1, "run: %v", err)
+	}
+
+	if *dsn != "" {
+		if *oltID == "" {
+			exit(2, "-dsn needs -olt-id (the database id of this device)")
+		}
+		if err := persist(ctx, *dsn, *oltID, results, startedAt); err != nil {
+			exit(1, "store run: %v", err)
+		}
+		fmt.Printf("\nstored run for %s\n", *oltID)
 	}
 
 	for _, result := range results {
@@ -157,6 +170,37 @@ func main() {
 		}
 		fmt.Printf("raw:\n%s\n", result.Raw)
 	}
+}
+
+// persist maps the adapter's rows to the ingest shapes and writes one run.
+// Evidence is written by the ingest layer from the raw output kept in Result.
+func persist(ctx context.Context, dsn, oltID string, results []collector.Result, at time.Time) error {
+	ing, err := collector.NewIngest(ctx, dsn, "vsol-epon@0.3")
+	if err != nil {
+		return err
+	}
+	defer ing.Close()
+
+	run := collector.Run{OltID: oltID, At: at}
+	for _, result := range results {
+		job := collector.Job{ResultID: result.CommandID, Line: result.Line, Raw: result.Raw, Err: result.Err}
+
+		switch rows := result.Parsed.(type) {
+		case []vsol.OnuRow:
+			job.Rows = vsol.ToStatusRows(rows)
+		case []vsol.OnuIdentity:
+			job.Rows = vsol.ToIdentityRows(rows)
+		case []vsol.OpticalRow:
+			job.Rows = vsol.ToOpticalRows(rows)
+		}
+		if result.Err != nil {
+			run.Failed = true
+			run.Reason = result.Err.Error()
+		}
+		run.Jobs = append(run.Jobs, job)
+	}
+	_, err = ing.Save(ctx, run)
+	return err
 }
 
 func resolveAdapter(name string) (collector.Adapter, error) {

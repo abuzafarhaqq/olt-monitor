@@ -15,7 +15,7 @@ test:
 # Integration suite against a real Postgres written in SQL. Needs the database
 # to exist; the seed wipes it, so point TEST_DATABASE_URL at a scratch database.
 test-db:
-	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test ./... -count=1 -v
+	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -p 1 ./... -count=1 -v
 
 # Same suite against PostgreSQL compiled to WASM — no server, no Docker.
 test-pglite:

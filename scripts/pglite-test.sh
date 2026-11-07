@@ -52,4 +52,6 @@ if ! head -1 /tmp/pglite-$$.log | grep -q "listening"; then
 fi
 
 cd "$ROOT"
-TEST_DATABASE_URL="$DSN" go test ./... -count=1 "$@"
+# -p 1: the packages share one database, and the postgres package seeds
+# (TRUNCATE). Run in parallel and one package wipes another's rows mid-test.
+TEST_DATABASE_URL="$DSN" go test -p 1 ./... -count=1 "$@"

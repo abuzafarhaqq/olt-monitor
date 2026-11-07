@@ -333,3 +333,43 @@ func parseBasicInfo(output string) (any, error) {
 	}
 	return rows, nil
 }
+
+// --- conversion to the ingest shapes -------------------------------------
+//
+// The adapter owns the vendor's row types; the collector owns the database
+// shapes. These three functions are the only bridge, so a schema change breaks
+// in one place.
+
+func ToStatusRows(rows []OnuRow) []collector.OnuStatusRow {
+	out := make([]collector.OnuStatusRow, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, collector.OnuStatusRow{
+			Pon: row.Pon, OnuID: row.OnuID, MAC: row.MAC,
+			Online: row.Status == "online", Distance: row.Distance,
+		})
+	}
+	return out
+}
+
+func ToIdentityRows(rows []OnuIdentity) []collector.OnuIdentityRow {
+	out := make([]collector.OnuIdentityRow, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, collector.OnuIdentityRow{
+			Pon: row.Pon, OnuID: row.OnuID, Vendor: row.Vendor, Model: row.Model,
+			HardwareVer: row.HardwareVer, SoftwareVer: row.SoftwareVer,
+			Type: row.Type, InterfaceType: row.InterfaceType,
+		})
+	}
+	return out
+}
+
+func ToOpticalRows(rows []OpticalRow) []collector.OpticalReading {
+	out := make([]collector.OpticalReading, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, collector.OpticalReading{
+			Pon: row.Pon, OnuID: row.OnuID, RxDbm: row.RxDbm, TxDbm: row.TxDbm,
+			TemperatureC: row.TemperatureC, SupplyVoltageV: row.SupplyVoltageV, TxBiasMa: row.TxBiasMa,
+		})
+	}
+	return out
+}
