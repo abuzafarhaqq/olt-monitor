@@ -40,6 +40,11 @@ type Adapter interface {
 	// configuration prompt. On the VSOL EPON the whole `show onu …` family is
 	// rejected in privileged mode with "% Unknown command".
 	RequiresConfigMode() bool
+	// Probes are read-only `?` queries used to discover what this firmware
+	// actually offers. "?" is answered immediately by the CLI and changes
+	// nothing; it is how the allow-list is checked against a real device
+	// instead of being assumed.
+	Probes() []string
 }
 
 // Session is the transport. The collector only ever sees this interface, so a

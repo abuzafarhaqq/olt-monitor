@@ -40,6 +40,7 @@ func main() {
 	timeout := flag.Duration("timeout", 20*time.Second, "per-command timeout")
 	confirm := flag.Bool("confirm", false, "actually connect; without it this prints the plan and exits")
 	acceptKey := flag.Bool("accept-key", false, "trust-on-first-use: record the device key and exit")
+	discover := flag.Bool("discover", false, "ask the CLI with '?' what it supports, print the answers, run nothing")
 	flag.Parse()
 
 	adapter, err := resolveAdapter(*adapterName)
@@ -108,6 +109,25 @@ func main() {
 		exit(1, "connect: %v", err)
 	}
 	defer session.Close()
+
+	if *discover {
+		// Read-only: each probe ends in '?', which the CLI answers with its
+		// option list instead of executing anything.
+		if adapter.RequiresConfigMode() {
+			if _, err := session.Run(ctx, "configure terminal"); err != nil {
+				exit(1, "enter configuration mode: %v", err)
+			}
+		}
+		for _, probe := range adapter.Probes() {
+			output, err := session.Run(ctx, probe)
+			fmt.Printf("\n=== %s\n", probe)
+			if err != nil {
+				fmt.Printf("! %v\n", err)
+			}
+			fmt.Println(strings.TrimSpace(output))
+		}
+		return
+	}
 
 	if adapter.RequiresConfigMode() {
 		// Entering the configuration prompt is required for `show onu …`; no

@@ -27,6 +27,19 @@ func (a Adapter) Commands() []collector.Command { return commands }
 // `epon-olt(config)#`. In privileged mode the device answers "% Unknown command".
 func (Adapter) RequiresConfigMode() bool { return true }
 
+// Probes walk down the command tree. Each one is answered by the CLI without
+// executing anything, so this is the safest possible way to learn a firmware's
+// capabilities.
+func (Adapter) Probes() []string {
+	return []string{
+		"show ?",
+		"show onu ?",
+		"show onu status ?",
+		"show onu opm-diag ?",
+		"show syslog ?",
+	}
+}
+
 func (a Adapter) Command(id string) (collector.Command, bool) {
 	for _, command := range commands {
 		if command.ID == id {
