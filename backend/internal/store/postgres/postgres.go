@@ -114,7 +114,9 @@ const onuColumns = `
        u.optical_supported, u.last_event,
        u.last_online_at, u.last_registration_at, u.last_deregistration_at,
        u.deregistrations_24h,
-       COALESCE(st.collection_status::text, 'failed')`
+       COALESCE(st.collection_status::text, 'failed'),
+       COALESCE(u.vendor_id, ''), COALESCE(u.onu_type, ''), COALESCE(u.interface_type, ''),
+       COALESCE(u.identity_source, 'unknown'), COALESCE(u.threshold_model, '')`
 
 const onuFrom = `
 FROM onus u
@@ -295,6 +297,7 @@ func scanOnu(row pgx.Row) (domain.Onu, error) {
 		&rx, &distance, &onu.OpticalSupported, &lastEvent,
 		&lastOnline, &lastReg, &lastDereg,
 		&onu.Deregistrations24h, &collectionSt,
+		&onu.VendorID, &onu.OnuType, &onu.InterfaceType, &onu.IdentitySource, &onu.ThresholdModel,
 	); err != nil {
 		return domain.Onu{}, err
 	}
@@ -305,6 +308,7 @@ func scanOnu(row pgx.Row) (domain.Onu, error) {
 	onu.LastRegistrationAt = timestamps(nil, lastReg, "trusted")
 	onu.LastDeregistrationAt = timestamps(nil, lastDereg, "trusted")
 	onu.CollectionStatus = domain.CollectionStatus(collectionSt)
+	onu.Provisioned = onu.IdentitySource == "basic-info"
 	return onu, nil
 }
 

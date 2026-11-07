@@ -1,0 +1,87 @@
+{
+ "session": "live-ui",
+ "total": 6,
+ "current_branch": "main",
+ "done": false,
+ "steps": [
+  {
+   "n": 1,
+   "branch": "main",
+   "thought": "Goal: the UI must show real collected data, with vendor/provisioned visible, then one real collection lands in the database. Question: what is the shortest path from the existing hook-based data layer to that, without adding a dependency?",
+   "uncertainty": false,
+   "files": [],
+   "revises": null,
+   "parent": null,
+   "ts": "2026-11-07T22:03:33+00:00"
+  },
+  {
+   "n": 2,
+   "branch": "main",
+   "thought": "Context7 (reactrouter, v6): loaders bind to a data router (createBrowserRouter). The app uses <BrowserRouter><Routes>, so adopting loaders is a router migration, not a data-layer tweak. Decision: keep useResource + dataSource, fix the missing fields instead. Recorded as a deliberate trade-off, not an oversight.",
+   "uncertainty": false,
+   "files": [
+    "frontend/src/app/router.tsx"
+   ],
+   "revises": null,
+   "parent": null,
+   "ts": "2026-11-07T22:03:49+00:00"
+  },
+  {
+   "n": 3,
+   "branch": "main",
+   "thought": "Gap analysis from grep: backend domain.Olt/Onu lack vendor_id, model, onu_type, interface_type, identity_source; the API never returns them, so the UI cannot show vendors no matter the data layer. Backend first, then types, then UI.",
+   "uncertainty": true,
+   "files": [
+    "backend/internal/domain/domain.go"
+   ],
+   "revises": null,
+   "parent": null,
+   "ts": "2026-11-07T22:03:50+00:00",
+   "superseded_by": 6
+  },
+  {
+   "n": 4,
+   "branch": "main",
+   "thought": "Implementation order: (a) add identity columns to domain.Onu + postgres scan, (b) mirror in TypeScript types, (c) UI: vendor column + Unprovisioned badge + vendor summary card, (d) prove by replaying captured rows into PGlite and curling the API — no device contact.",
+   "uncertainty": false,
+   "files": [
+    "backend/internal/domain/domain.go",
+    "backend/internal/store/postgres/postgres.go",
+    "frontend/src/types/domain.ts"
+   ],
+   "revises": null,
+   "parent": null,
+   "ts": "2026-11-07T22:04:06+00:00"
+  },
+  {
+   "n": 5,
+   "branch": "main",
+   "thought": "Replay of the captured rows into PGlite via ingest: 161 ONUs (133 provisioned, 28 status-only), 14 vendor ids. GET /dashboard/overview now returns vendorId/model/onuType/interfaceType/provisioned per ONU — so the UI's vendor column and Unprovisioned badge are fed by real shapes, not the fixture.",
+   "uncertainty": false,
+   "files": [],
+   "revises": null,
+   "parent": null,
+   "ts": "2026-11-07T22:07:47+00:00"
+  },
+  {
+   "n": 6,
+   "branch": "main",
+   "thought": "Closed: domain.Onu, the postgres scan and TypeScript types now carry vendorId/onuType/interfaceType/identitySource/thresholdModel/provisioned; the API returns them and the ONU pages render them. Confirmed by the replay + curl above, not inferred.",
+   "uncertainty": false,
+   "files": [],
+   "revises": 3,
+   "parent": null,
+   "ts": "2026-11-07T22:09:04+00:00"
+  }
+ ],
+ "branches": {
+  "main": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6
+  ]
+ }
+}

@@ -110,6 +110,18 @@ type Onu struct {
 	LastDeregistrationAt *DeviceTimestamps `json:"lastDeregistrationAt"`
 	Deregistrations24h   int               `json:"deregistrations24h"`
 	CollectionStatus     CollectionStatus  `json:"collectionStatus"`
+
+	// Identity from `show onu basic-info`. VendorID is the ONU vendor (MONU,
+	// HWTC, ZTE…), never the OLT's: one PON carries many.
+	VendorID       string `json:"vendorId"`
+	OnuType        string `json:"onuType"`
+	InterfaceType  string `json:"interfaceType"`
+	IdentitySource string `json:"identitySource"`
+	ThresholdModel string `json:"thresholdModel"`
+	// Provisioned is derived: an ONU seen only in the status table has no
+	// identity, which makes it an unprovisioned entry rather than a customer
+	// who is down.
+	Provisioned bool `json:"provisioned"`
 }
 
 type EventSeverity string
