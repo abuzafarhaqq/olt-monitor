@@ -130,18 +130,6 @@ func TestUnrecognisedOutputIsAnError(t *testing.T) {
 	}
 }
 
-// opm-diag is allow-listed but has no parser until its output is captured: raw
-// evidence only, never a guess.
-func TestOpticalCommandIsRawUntilCaptured(t *testing.T) {
-	command, ok := vsol.New().Command("opm-diag")
-	if !ok {
-		t.Fatal("opm-diag should stay allow-listed")
-	}
-	if command.Parse != nil {
-		t.Fatal("opm-diag has a parser that was written without a real sample")
-	}
-}
-
 func TestOnlyAllowListedCommandsResolve(t *testing.T) {
 	adapter := vsol.New()
 	if _, ok := adapter.Command("shell"); ok {
@@ -151,5 +139,54 @@ func TestOnlyAllowListedCommandsResolve(t *testing.T) {
 		if command.Line == "" {
 			t.Fatalf("%s has no command line", command.ID)
 		}
+	}
+}
+
+// Real rows from `show onu opm-diag all`. No MACs appear in this output, so the
+// values are kept as captured.
+const opticalSample = `ONU-ID      Temperature(C)    Supply Voltage(V)   TX Bias Current(mA)   TX Power(dBm)   RX Power(dBm)
+------      --------------    -----------------   -------------------   -------------   -------------
+EPON0/1:1   58.88             3.22                12.69                 3.02            -16.60
+EPON0/1:9   35.24             3.33                18.05                 1.73            -28.86
+EPON0/3:64  40.39             3.41                16.85                 1.78            -25.09
+`
+
+func TestParseOpticalFromRealOutput(t *testing.T) {
+	command, ok := vsol.New().Command("opm-diag")
+	if !ok || command.Parse == nil {
+		t.Fatal("opm-diag has no parser")
+	}
+
+	parsed, err := command.Parse(opticalSample)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	rows := parsed.([]vsol.OpticalRow)
+	if len(rows) != 3 {
+		t.Fatalf("rows = %d, want 3 (header and separator must not match)", len(rows))
+	}
+
+	first := rows[0]
+	if first.Pon != "0/1" || first.OnuID != 1 {
+		t.Fatalf("identity = %s:%d", first.Pon, first.OnuID)
+	}
+	// This device reports the full optical set for every ONU, not just RX.
+	if first.TemperatureC != 58.88 || first.SupplyVoltageV != 3.22 ||
+		first.TxBiasMa != 12.69 || first.TxDbm != 3.02 || first.RxDbm != -16.60 {
+		t.Fatalf("values = %+v", first)
+	}
+
+	if rows[1].RxDbm != -28.86 {
+		t.Fatalf("critical reading = %v", rows[1].RxDbm)
+	}
+	if rows[2].OnuID != 64 {
+		t.Fatalf("two-digit onu id = %d", rows[2].OnuID)
+	}
+}
+
+func TestOpticalRejectsGarbage(t *testing.T) {
+	command, _ := vsol.New().Command("opm-diag")
+	if _, err := command.Parse("% unknown command"); err == nil {
+		t.Fatal("garbage parsed as optical rows")
 	}
 }

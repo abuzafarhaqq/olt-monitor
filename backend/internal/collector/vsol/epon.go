@@ -38,11 +38,7 @@ var commands = []collector.Command{
 	{ID: "version", Line: "show version", Parse: parseVersion},
 	{ID: "time", Line: "show time", Parse: parseTime},
 	{ID: "onu-status", Line: "show onu status all", Parse: parseOnuStatus},
-	// No parser yet: the output format has not been captured from a real
-	// device. The command stays allow-listed so the raw text can be collected as
-	// evidence, and the parser gets written against that text rather than
-	// guessed.
-	{ID: "opm-diag", Line: "show onu opm-diag all"},
+	{ID: "opm-diag", Line: "show onu opm-diag all", Parse: parseOptical},
 }
 
 // --- version -------------------------------------------------------------
@@ -199,4 +195,61 @@ func atoi(value string) int {
 		return 0
 	}
 	return n
+}
+
+// --- optical -------------------------------------------------------------
+
+// OpticalRow is one line of `show onu opm-diag all`.
+//
+// This device reports the full optical set per ONU — temperature, supply
+// voltage, TX bias, TX power and RX power — so there is no "EPON only reports
+// RX" special case. Every column is present in the capture, which is why these
+// are plain float64 and not pointers: a missing column would fail the match
+// instead of silently becoming zero.
+type OpticalRow struct {
+	Pon            string
+	OnuID          int
+	TemperatureC   float64
+	SupplyVoltageV float64
+	TxBiasMa       float64
+	TxDbm          float64
+	RxDbm          float64
+}
+
+// EPON0/1:1   58.88   3.22   12.69   3.02   -16.60
+var reOpticalRow = regexp.MustCompile(
+	`^(?:EPON)?(\d+/\d+):(\d+)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+` +
+		`(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*$`)
+
+func parseOptical(output string) (any, error) {
+	rows := make([]OpticalRow, 0, 128)
+
+	for _, line := range strings.Split(output, "\n") {
+		match := reOpticalRow.FindStringSubmatch(strings.TrimSpace(line))
+		if match == nil {
+			continue
+		}
+		rows = append(rows, OpticalRow{
+			Pon:            match[1],
+			OnuID:          atoi(match[2]),
+			TemperatureC:   atof(match[3]),
+			SupplyVoltageV: atof(match[4]),
+			TxBiasMa:       atof(match[5]),
+			TxDbm:          atof(match[6]),
+			RxDbm:          atof(match[7]),
+		})
+	}
+
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no optical rows recognised — the column layout may have changed")
+	}
+	return rows, nil
+}
+
+func atof(value string) float64 {
+	f, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return 0
+	}
+	return f
 }
