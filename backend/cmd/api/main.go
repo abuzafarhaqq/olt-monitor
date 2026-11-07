@@ -50,7 +50,7 @@ func main() {
 		}
 		defer pg.Close()
 		logger.Info("connected to postgres")
-		server := api.NewServer(pg, logger).WithAuth(pg).WithAudit(pg).WithDevices(pg)
+		server := api.NewServer(pg, logger).WithAuth(pg).WithAudit(pg).WithDevices(pg).WithUsers(pg)
 
 		// Credential storage needs a key. Without one the endpoints answer 503
 		// rather than storing device passwords in the clear.

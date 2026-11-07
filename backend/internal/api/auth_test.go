@@ -13,6 +13,7 @@ import (
 
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/api"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/auth"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
 	"github.com/abuzafarhaqq/olt-monitor/db"
 )
@@ -30,7 +31,7 @@ func newAuthServer(t *testing.T) (http.Handler, *postgres.Store, string) {
 	if err != nil {
 		t.Fatalf("hash: %v", err)
 	}
-	if _, err := st.CreateUser(context.Background(), postgres.CreateUserParams{
+	if _, err := st.CreateUser(context.Background(), store.CreateUserParams{
 		Username:     username,
 		FullName:     "NOC Operator",
 		Email:        username + "@example.test",

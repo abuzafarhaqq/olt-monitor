@@ -121,3 +121,14 @@ func (s *Store) DeleteCredential(ctx context.Context, oltID string) error {
 	}
 	return nil
 }
+
+func (s *Store) DeleteOlt(ctx context.Context, id string) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM olts WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete olt: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return store.ErrNotFound
+	}
+	return nil
+}

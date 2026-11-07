@@ -18,6 +18,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/auth"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
 )
 
@@ -95,7 +96,7 @@ func create(ctx context.Context, st *postgres.Store, args []string) int {
 		return 1
 	}
 
-	user, err := st.CreateUser(ctx, postgres.CreateUserParams{
+	user, err := st.CreateUser(ctx, store.CreateUserParams{
 		Username:     *username,
 		FullName:     *name,
 		Email:        *email,

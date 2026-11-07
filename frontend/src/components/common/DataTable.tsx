@@ -36,6 +36,9 @@ export function DataTable<T>({
   }
 
   return (
+    // A wide diagnostic table scrolls inside its card instead of pushing the
+    // whole page sideways on a phone.
+    <div className="table-scroll">
     <table className="data-table">
       {caption ? <caption className="visually-hidden">{caption}</caption> : null}
       <thead>
@@ -66,5 +69,6 @@ export function DataTable<T>({
         ))}
       </tbody>
     </table>
+    </div>
   );
 }

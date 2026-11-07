@@ -104,16 +104,7 @@ func (s *Store) TouchLogin(ctx context.Context, userID string) error {
 
 // --- user management (used by tests and by oltctl, not by the read API) ---
 
-type CreateUserParams struct {
-	Username     string
-	FullName     string
-	Email        string
-	Phone        string
-	Role         string
-	PasswordHash string
-}
-
-func (s *Store) CreateUser(ctx context.Context, params CreateUserParams) (store.User, error) {
+func (s *Store) CreateUser(ctx context.Context, params store.CreateUserParams) (store.User, error) {
 	var id string
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO users (username, full_name, email, phone, role, password_hash)

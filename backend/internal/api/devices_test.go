@@ -16,6 +16,7 @@ import (
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/crypto"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/domain"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/secrets"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
 )
 
@@ -39,7 +40,7 @@ func deviceServer(t *testing.T, withSecrets bool) (http.Handler, *postgres.Store
 
 	st := openPostgres(t, testDSN(t))
 
-	server := api.NewServer(st, nil).WithAuth(st).WithAudit(st).WithDevices(st)
+	server := api.NewServer(st, nil).WithAuth(st).WithAudit(st).WithDevices(st).WithUsers(st)
 	var service *secrets.Service
 	if withSecrets {
 		service = secrets.New(newKeyring(t), st)
@@ -48,7 +49,10 @@ func deviceServer(t *testing.T, withSecrets bool) (http.Handler, *postgres.Store
 	return server.Routes(), st, service
 }
 
-func loginAs(t *testing.T, handler http.Handler, st *postgres.Store, role string) *http.Cookie {
+// loginAsUser creates the account and signs in, returning both. Tests that
+// demote or delete administrators need the identity that owns the cookie —
+// guessing "the first administrator" picks up accounts from other tests.
+func loginAsUser(t *testing.T, handler http.Handler, st *postgres.Store, role string) (*http.Cookie, store.User) {
 	t.Helper()
 
 	username := fmt.Sprintf("u-%s-%d", role, time.Now().UnixNano())
@@ -56,10 +60,12 @@ func loginAs(t *testing.T, handler http.Handler, st *postgres.Store, role string
 	if err != nil {
 		t.Fatalf("hash: %v", err)
 	}
-	if _, err := st.CreateUser(context.Background(), postgres.CreateUserParams{
+
+	user, err := st.CreateUser(context.Background(), store.CreateUserParams{
 		Username: username, FullName: username, Email: username + "@example.test",
 		Role: role, PasswordHash: hash,
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
@@ -67,11 +73,17 @@ func loginAs(t *testing.T, handler http.Handler, st *postgres.Store, role string
 		map[string]string{"username": username, "password": "correct horse battery staple"})
 	for _, cookie := range rec.Result().Cookies() {
 		if cookie.Name == api.SessionCookieName {
-			return cookie
+			return cookie, user
 		}
 	}
 	t.Fatalf("login failed for %s: %d %s", role, rec.Code, rec.Body.String())
-	return nil
+	return nil, store.User{}
+}
+
+func loginAs(t *testing.T, handler http.Handler, st *postgres.Store, role string) *http.Cookie {
+	t.Helper()
+	cookie, _ := loginAsUser(t, handler, st, role)
+	return cookie
 }
 
 func call(t *testing.T, handler http.Handler, method, path string, body any, cookie *http.Cookie) *httptest.ResponseRecorder {

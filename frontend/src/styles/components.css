@@ -1090,3 +1090,122 @@
   display: inline-flex;
   gap: var(--space-2);
 }
+
+/* Destructive actions ---------------------------------------------------- */
+
+.btn--danger {
+  border-color: var(--color-offline);
+  background: var(--color-offline);
+  color: #fff;
+}
+
+.card--danger {
+  border-color: var(--color-offline);
+}
+
+.card--danger .card__title {
+  color: var(--color-offline);
+}
+
+/* Wide tables scroll inside their card instead of breaking the page. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ---- Tablet (≤1024px) ------------------------------------------------- */
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
+/* ---- Phone (≤640px) --------------------------------------------------- */
+@media (max-width: 640px) {
+  .app-content {
+    padding: var(--space-3) var(--space-3) var(--space-8);
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .page-header__title {
+    font-size: var(--text-xl);
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    gap: var(--space-2);
+  }
+
+  .metric-card {
+    padding: var(--space-3);
+  }
+
+  .metric-card__value {
+    font-size: var(--text-xl);
+  }
+
+  /* Filters stack: side-by-side selects are unusable at this width. */
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .filter-field {
+    min-width: 0;
+  }
+
+  .form__grid,
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form__row {
+    flex-direction: column;
+  }
+
+  .facts {
+    grid-template-columns: 1fr 1fr;
+    padding: var(--space-3);
+  }
+
+  .drawer {
+    width: 100vw;
+  }
+
+  .tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .tabs__tab {
+    white-space: nowrap;
+  }
+
+  .matrix th:not(:first-child),
+  .matrix td:not(:first-child) {
+    width: 62px;
+    font-size: 0.625rem;
+  }
+
+  .topbar__search {
+    display: none;
+  }
+
+  .auth-card {
+    padding: var(--space-4);
+  }
+
+  .event-row {
+    grid-template-columns: 62px 1fr auto;
+  }
+}

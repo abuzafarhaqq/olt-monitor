@@ -22,6 +22,7 @@ type Server struct {
 	auth      store.AuthStore
 	audit     store.AuditStore
 	devices   store.DeviceStore
+	users     store.UserStore
 	secrets   *secrets.Service
 	log       *slog.Logger
 	heartbeat time.Duration
@@ -69,6 +70,13 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("PUT /api/v1/olts/{id}/credential", s.guard(auth.PermDeviceManage, s.setCredential))
 	mux.HandleFunc("GET /api/v1/olts/{id}/credential", s.guard(auth.PermDeviceRead, s.getCredentialMeta))
 	mux.HandleFunc("DELETE /api/v1/olts/{id}/credential", s.guard(auth.PermDeviceManage, s.deleteCredential))
+	mux.HandleFunc("DELETE /api/v1/olts/{id}", s.guard(auth.PermDeviceManage, s.deleteOlt))
+
+	mux.HandleFunc("GET /api/v1/users", s.guard(auth.PermUsersManage, s.listUsers))
+	mux.HandleFunc("POST /api/v1/users", s.guard(auth.PermUsersManage, s.createUser))
+	mux.HandleFunc("PATCH /api/v1/users/{id}", s.guard(auth.PermUsersManage, s.updateUser))
+	mux.HandleFunc("PUT /api/v1/users/{id}/password", s.guard(auth.PermUsersManage, s.setUserPassword))
+	mux.HandleFunc("DELETE /api/v1/users/{id}", s.guard(auth.PermUsersManage, s.deleteUser))
 
 	return s.recoverer(s.logger(mux))
 }

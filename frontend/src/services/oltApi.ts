@@ -61,3 +61,8 @@ export async function deleteCredential(id: string): Promise<void> {
   if (USE_MOCK_API) throw new Error(MOCK_WRITE_ERROR);
   await request<void>(`/olts/${id}/credential`, { method: "DELETE" });
 }
+
+export async function deleteOlt(id: string): Promise<void> {
+  if (USE_MOCK_API) throw new Error(MOCK_WRITE_ERROR);
+  await request<void>(`/olts/${id}`, { method: "DELETE" });
+}

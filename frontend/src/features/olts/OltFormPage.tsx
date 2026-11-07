@@ -8,6 +8,7 @@ import { dataSource } from "../../services/data";
 import {
   WRITES_AVAILABLE,
   createOlt,
+  deleteOlt,
   getCredentialMeta,
   setCredential,
   updateOlt,
@@ -90,6 +91,7 @@ export function OltFormPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [problem, setProblem] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if (!isEdit || oltId === undefined) return;
@@ -360,6 +362,49 @@ export function OltFormPage() {
               {problem}
             </p>
           )}
+
+          {isEdit ? (
+            <section className="card card--danger" aria-label="Delete device">
+              <div className="card__header">
+                <h2 className="card__title">Delete device</h2>
+                <span className="card__aside">removes its ports, ONUs, events and incidents</span>
+              </div>
+              <div className="card__body">
+                {confirmingDelete ? (
+                  <div className="form__actions">
+                    <button type="button" className="btn" onClick={() => setConfirmingDelete(false)}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--danger"
+                      disabled={status === "saving"}
+                      onClick={async () => {
+                        setStatus("saving");
+                        try {
+                          await deleteOlt(oltId);
+                          navigate("/olts");
+                        } catch (caught) {
+                          setStatus("idle");
+                          setProblem(caught instanceof Error ? caught.message : "Could not delete");
+                        }
+                      }}
+                    >
+                      Delete {existing?.name} permanently
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => setConfirmingDelete(true)}
+                  >
+                    Delete this device…
+                  </button>
+                )}
+              </div>
+            </section>
+          ) : null}
 
           <div className="form__actions">
             <Link className="btn" to="/olts">

@@ -251,3 +251,24 @@ func (s *Server) auditActor(r *http.Request, action, target, detail string) {
 		s.log.Error("audit", "action", action, "error", err)
 	}
 }
+
+// deleteOlt removes a device and everything that cascades from it: ports, ONUs,
+// measurements, events, incidents. Irreversible, so it is audited with the
+// device name before the row disappears.
+func (s *Server) deleteOlt(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	olt, err := s.store.Olt(r.Context(), id)
+	if err != nil {
+		s.handleStoreError(w, err)
+		return
+	}
+
+	if err := s.devices.DeleteOlt(r.Context(), id); err != nil {
+		s.handleStoreError(w, err)
+		return
+	}
+
+	s.auditActor(r, "olt.delete", id, olt.Name)
+	w.WriteHeader(http.StatusNoContent)
+}

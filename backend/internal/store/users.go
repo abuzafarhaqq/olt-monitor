@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/domain"
@@ -58,4 +59,45 @@ type DeviceStore interface {
 	Store
 	CreateOlt(ctx context.Context, p OltWrite) (domain.Olt, error)
 	UpdateOlt(ctx context.Context, p OltWrite) (domain.Olt, error)
+	DeleteOlt(ctx context.Context, id string) error
 }
+
+// UserWrite is the editable shape of an account. The password never travels in
+// it: it has its own path with its own permission.
+type UserWrite struct {
+	ID       string
+	FullName string
+	Email    string
+	Phone    string
+	Role     string
+	Disabled bool
+}
+
+// UserStore is the administration surface. Separate from AuthStore so the login
+// path cannot grow user-management powers by accident.
+type UserStore interface {
+	ListUsers(ctx context.Context) ([]User, error)
+	CreateUser(ctx context.Context, p CreateUserParams) (User, error)
+	UpdateUser(ctx context.Context, p UserWrite) (User, error)
+	SetPasswordHash(ctx context.Context, id, hash string) error
+	DeleteUser(ctx context.Context, id string) error
+	CountEnabledAdmins(ctx context.Context) (int, error)
+}
+
+// CreateUserParams lives here rather than in postgres so the HTTP layer can
+// create accounts without importing a storage driver.
+type CreateUserParams struct {
+	Username     string
+	FullName     string
+	Email        string
+	Phone        string
+	Role         string
+	PasswordHash string
+}
+
+var (
+	// ErrLastAdmin blocks an action that would leave the system with no active
+	// administrator — an unrecoverable state.
+	ErrLastAdmin = errors.New("this would leave no active administrator")
+	ErrConflict  = errors.New("already exists")
+)
