@@ -245,6 +245,10 @@ if [ "$WANT_DB" = "1" ]; then
 else
   step "mock mode: the frontend serves fixtures and the API uses its in-memory data"
   export VITE_USE_MOCK_API=true
+  # cmd/api defaults its -dsn from DATABASE_URL, so an exported (or stale) DSN
+  # would drag mock mode into Postgres and fail the health check. Say it
+  # explicitly: no database here.
+  BACKEND_ARGS+=(-dsn "")
 fi
 
 step "starting the API on :${BACKEND_PORT}"
