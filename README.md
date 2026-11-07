@@ -15,22 +15,46 @@ olt-monitor/
 ## Quick start
 
 ```bash
-cd frontend && pnpm install && cd ..   # once
-./app.sh                               # mock data, no database
+./app.sh --install     # go modules + frontend dependencies (installs go/node if missing and apt is available)
+./app.sh               # mock data: no database touched
 ```
 
-Then open http://127.0.0.1:5173. Mock sign-in: `admin` / `engineer` /
-`operator` / `viewer`, password `demo`.
+Open http://127.0.0.1:5173 and sign in with `admin` / `engineer` / `operator` /
+`viewer`, password `demo`.
 
 With a database:
 
 ```bash
-export DATABASE_URL="postgres://oltmon:oltmon@localhost:5432/oltmon?sslmode=disable"
-export OLT_SECRETS_KEY="$(head -c 32 /dev/urandom | base64)"   # device credentials
-./app.sh --db --seed                   # migrate, load the demo fixture, serve
+./app.sh --db          # find/start a database, migrate, serve real data
+./app.sh --db --seed   # ...and replace its contents with the demo fixture
 ```
 
+`--db` resolves a database in this order, and prints which one it used:
+
+1. `DATABASE_URL` is set → use it
+2. `docker` + `db/docker-compose.yml` → `docker compose up -d`
+3. `node` available → **PGlite**, PostgreSQL compiled to WASM, in memory
+4. none → stop with instructions
+
+PGlite means `--db` works on a laptop with nothing installed, but its data is
+gone when the script stops. For anything persistent, use `DATABASE_URL`.
+
 `--seed` **replaces** the database contents. Never point it at production.
+
+### Secrets
+
+Device credentials are encrypted with `OLT_SECRETS_KEY`. If it is not exported,
+`app.sh` generates one at `.secrets/olt_secrets_key` (0600, gitignored) and says
+so — losing that file makes stored OLT passwords unreadable.
+
+### Accounts
+
+The seed loads devices, not people. On a fresh database create the first account:
+
+```bash
+go run ./backend/cmd/userctl create -username admin -name "Your Name" \
+  -email you@example.net -role administrator
+```
 
 ## What runs where
 
