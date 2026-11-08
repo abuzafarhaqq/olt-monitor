@@ -325,7 +325,11 @@ if [ "$WANT_DB" = "1" ]; then
 
   MIGRATE_ARGS=(-dsn "$DATABASE_URL")
   [ "$WANT_SEED" = "1" ] && MIGRATE_ARGS+=(-seed)
-  step "applying migrations${WANT_SEED:+ and demo fixture}"
+  if [ "$WANT_SEED" = "1" ]; then
+    step "applying migrations and replacing the demo fixture"
+  else
+    step "applying migrations"
+  fi
   (cd "$ROOT" && go run ./backend/cmd/migrate "${MIGRATE_ARGS[@]}") || die "migration failed"
 
   BACKEND_ARGS+=(-dsn "$DATABASE_URL")
@@ -342,12 +346,23 @@ else
   BACKEND_ARGS+=(-dsn "")
 fi
 
+port_taken() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && { exec 3<&- 3>&-; return 0; }; return 1; }
+
+for port in "$BACKEND_PORT" "$FRONTEND_PORT"; do
+  if port_taken "$port"; then
+    die "port ${port} is already in use — another instance is still running.
+
+     stop it (Ctrl-C in its terminal, or: pkill -f 'cmd/api'; pkill -f vite),
+     or move this one: BACKEND_PORT=$((BACKEND_PORT+10)) FRONTEND_PORT=$((FRONTEND_PORT+10)) ./app.sh"
+  fi
+done
+
 step "starting the API on :${BACKEND_PORT}"
 (cd "$ROOT" && go run ./backend/cmd/api "${BACKEND_ARGS[@]}") >"$LOG_DIR/backend.log" 2>&1 &
 PIDS+=($!)
 
 for _ in $(seq 1 90); do
-  curl -sf "http://127.0.0.1:${BACKEND_PORT}/api/v1/health" >/dev/null 2>&1 && break
+  if curl -sf "http://127.0.0.1:${BACKEND_PORT}/api/v1/health" >/dev/null 2>&1; then break; fi
   sleep 0.5
 done
 curl -sf "http://127.0.0.1:${BACKEND_PORT}/api/v1/health" >/dev/null \
@@ -357,10 +372,20 @@ step "starting the frontend on :${FRONTEND_PORT}"
 (cd "$ROOT/frontend" && "$(package_manager)" dev --host "$BIND_HOST" --port "$FRONTEND_PORT") >"$LOG_DIR/frontend.log" 2>&1 &
 PIDS+=($!)
 
+FRONTEND_UP=0
 for _ in $(seq 1 60); do
-  curl -sf "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null 2>&1 && break
+  # `cmd && break` as the last statement of a loop body aborts under set -e;
+  # the frontend taking a few seconds to boot is normal, not a failure.
+  if curl -sf "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null 2>&1; then
+    FRONTEND_UP=1
+    break
+  fi
   sleep 0.5
 done
+if [ "$FRONTEND_UP" = "0" ]; then
+  tail -15 "$LOG_DIR/frontend.log" >&2
+  die "the frontend did not answer on :${FRONTEND_PORT}"
+fi
 
 # The address another machine should use, when we know it.
 LAN_IP=""
