@@ -352,13 +352,22 @@ for port in "$BACKEND_PORT" "$FRONTEND_PORT"; do
   if port_taken "$port"; then
     die "port ${port} is already in use — another instance is still running.
 
-     stop it (Ctrl-C in its terminal, or: pkill -f 'cmd/api'; pkill -f vite),
+     stop it:
+       pkill -f 'exe/api'      # an API started by `go run` runs as .../exe/api
+       pkill -f '\.bin/api'    # …or as .bin/api, once this script starts it
+       pkill -f vite
      or move this one: BACKEND_PORT=$((BACKEND_PORT+10)) FRONTEND_PORT=$((FRONTEND_PORT+10)) ./app.sh"
   fi
 done
 
+step "building the API"
+mkdir -p "$ROOT/.bin"
+if ! (cd "$ROOT" && go build -o "$ROOT/.bin/api" ./backend/cmd/api); then
+  die "the API did not compile"
+fi
+
 step "starting the API on :${BACKEND_PORT}"
-(cd "$ROOT" && go run ./backend/cmd/api "${BACKEND_ARGS[@]}") >"$LOG_DIR/backend.log" 2>&1 &
+"$ROOT/.bin/api" "${BACKEND_ARGS[@]}" >"$LOG_DIR/backend.log" 2>&1 &
 PIDS+=($!)
 
 for _ in $(seq 1 90); do
