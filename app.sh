@@ -6,6 +6,7 @@
 #   ./app.sh --db            start/find a database, migrate, serve real data
 #   ./app.sh --db --seed     ... and replace its contents with the demo fixture
 #   ./app.sh --install       install dependencies, then exit
+#   ./app.sh --lan           listen on 0.0.0.0 so other machines can reach it
 #   ./app.sh --mock          ignore any configured database
 #   ./app.sh --pglite        ignore DATABASE_URL and use PGlite anyway
 #   ./app.sh --no-install    never install anything, fail if something is missing
@@ -31,6 +32,8 @@ WANT_INSTALL_ONLY=0
 ALLOW_INSTALL=1
 FORCE_PGLITE=0
 FORCE_MOCK=0
+LAN=0
+BIND_HOST="127.0.0.1"
 CONFIG_FILE="$ROOT/.secrets/app.env"
 
 for arg in "$@"; do
@@ -39,6 +42,7 @@ for arg in "$@"; do
     --seed) WANT_SEED=1 ;;
     --install) WANT_INSTALL_ONLY=1 ;;
     --mock) FORCE_MOCK=1 ;;
+    --lan) LAN=1 ;;
     --pglite) FORCE_PGLITE=1 ;;
     --no-install) ALLOW_INSTALL=0 ;;
     -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -300,6 +304,14 @@ ensure_node
 ensure_go_deps
 ensure_frontend_deps
 
+if [ "$LAN" = "1" ]; then
+  BIND_HOST="0.0.0.0"
+  # Only the UI is exposed. The API stays on loopback and the Vite proxy reaches
+  # it from the same process: one less port open on the network, and the session
+  # cookie still works because the browser only ever talks to :5173.
+  warn "--lan: the UI is reachable from every host on this network, over plain HTTP (API stays on 127.0.0.1)"
+fi
+
 BACKEND_ARGS=(-addr "127.0.0.1:${BACKEND_PORT}")
 
 if [ "$WANT_SEED" = "1" ] && [ "$WANT_DB" = "0" ]; then
@@ -342,13 +354,24 @@ curl -sf "http://127.0.0.1:${BACKEND_PORT}/api/v1/health" >/dev/null \
   || { tail -20 "$LOG_DIR/backend.log" >&2; die "the API did not become healthy"; }
 
 step "starting the frontend on :${FRONTEND_PORT}"
-(cd "$ROOT/frontend" && "$(package_manager)" dev --host 127.0.0.1 --port "$FRONTEND_PORT") >"$LOG_DIR/frontend.log" 2>&1 &
+(cd "$ROOT/frontend" && "$(package_manager)" dev --host "$BIND_HOST" --port "$FRONTEND_PORT") >"$LOG_DIR/frontend.log" 2>&1 &
 PIDS+=($!)
 
 for _ in $(seq 1 60); do
   curl -sf "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null 2>&1 && break
   sleep 0.5
 done
+
+# The address another machine should use, when we know it.
+LAN_IP=""
+if [ "$LAN" = "1" ]; then
+  LAN_IP="$(ip -4 addr show 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | grep -v '^127\.' | head -1)"
+  [ -n "$LAN_IP" ] || LAN_IP="$(ifconfig 2>/dev/null | awk '/inet /{print $2}' | grep -v '^127\.' | head -1)"
+  [ -n "$LAN_IP" ] || LAN_IP="$(getprop dhcp.wlan0.ipaddress 2>/dev/null)"
+  if [ -z "$LAN_IP" ]; then
+    warn "could not detect this machine's IP — look it up in Android Wi-Fi settings"
+  fi
+fi
 
 if [ "$WANT_DB" = "1" ]; then
   DB_STATE="$DSN_MODE"
@@ -365,13 +388,13 @@ cat <<INFO
   ┌─────────────┬──────────────────────────────────────────────┐
   │ database    │ ${DB_STATE}
   │ api         │ http://127.0.0.1:${BACKEND_PORT}/api/v1/health
-  │ frontend    │ http://127.0.0.1:${FRONTEND_PORT}
+  │ frontend    │ http://127.0.0.1:${FRONTEND_PORT}$( [ -n "$LAN_IP" ] && printf '\n  │ from LAN    │ http://%s:%s' "$LAN_IP" "$FRONTEND_PORT" )
   │ logs        │ ${LOG_DIR}
   └─────────────┴──────────────────────────────────────────────┘
 
   ${SIGNIN}
 
-  Ctrl-C stops everything.
+  Ctrl-C stops everything.$( [ "$LAN" = "1" ] && printf '\n\n  Anyone on this network can reach the login page. There is no TLS and no\n  rate limiting yet: use --lan on a trusted network only.' )
 
 INFO
 
