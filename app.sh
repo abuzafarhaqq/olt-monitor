@@ -6,6 +6,7 @@
 #   ./app.sh --db            start/find a database, migrate, serve real data
 #   ./app.sh --db --seed     ... and replace its contents with the demo fixture
 #   ./app.sh --install       install dependencies, then exit
+#   ./app.sh --mock          ignore any configured database
 #   ./app.sh --pglite        ignore DATABASE_URL and use PGlite anyway
 #   ./app.sh --no-install    never install anything, fail if something is missing
 #
@@ -29,12 +30,15 @@ WANT_SEED=0
 WANT_INSTALL_ONLY=0
 ALLOW_INSTALL=1
 FORCE_PGLITE=0
+FORCE_MOCK=0
+CONFIG_FILE="$ROOT/.secrets/app.env"
 
 for arg in "$@"; do
   case "$arg" in
     --db) WANT_DB=1 ;;
     --seed) WANT_SEED=1 ;;
     --install) WANT_INSTALL_ONLY=1 ;;
+    --mock) FORCE_MOCK=1 ;;
     --pglite) FORCE_PGLITE=1 ;;
     --no-install) ALLOW_INSTALL=0 ;;
     -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -48,6 +52,28 @@ ok()   { printf '\033[1;32m✓\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
+
+# --- configuration ------------------------------------------------------
+# .secrets/app.env is the single place for the DSN and the device passwords.
+# 0600, gitignored, sourced here so ./app.sh alone knows how to reach the
+# database. Marked with set -a so every child process inherits it.
+if [ -f "$CONFIG_FILE" ]; then
+  chmod 600 "$CONFIG_FILE" 2>/dev/null || true
+  set -a
+  # shellcheck disable=SC1090
+  . "$CONFIG_FILE"
+  set +a
+  step "configuration loaded from ${CONFIG_FILE#$ROOT/}"
+fi
+
+# A configured database means "run against it" — no --db flag needed.
+if [ "${DATABASE_URL:-}" != "" ] && [ "$FORCE_MOCK" != "1" ]; then
+  WANT_DB=1
+fi
+if [ "$FORCE_MOCK" = "1" ]; then
+  WANT_DB=0
+  DATABASE_URL=""
+fi
 
 # --- dependency installation ---------------------------------------------
 apt_install() {
@@ -228,7 +254,29 @@ resolve_database() {
     return
   fi
 
-  die "no database available: set DATABASE_URL, install docker, or install node for PGlite"
+  mkdir -p "$ROOT/.secrets"; chmod 700 "$ROOT/.secrets"
+  if [ ! -f "$CONFIG_FILE" ]; then
+    cat >"$CONFIG_FILE" <<'TEMPLATE'
+# Sourced by app.sh on every start. Keep this file 0600 and never commit it.
+#
+# The database the app should use. Leave commented to run on fixture data.
+# DATABASE_URL="postgres://oltmon:YOUR_PASSWORD@127.0.0.1:5432/oltmon?sslmode=disable"
+#
+# Device passwords for the character-mode CLI and privileged mode. The SSH
+# password itself lives encrypted in olt_credentials, not here.
+# OLT_CLI_PASSWORD=
+# OLT_ENABLE_PASSWORD=
+#
+# Set to "false" to let the Refresh button show the plan but never dial.
+# OLT_ALLOW_COLLECT=true
+TEMPLATE
+    chmod 600 "$CONFIG_FILE"
+    die "no database configured.
+
+     I created ${CONFIG_FILE#$ROOT/} — fill in DATABASE_URL there (one line),
+     or start Postgres and re-run with --db, or use ./app.sh --mock for fixtures."
+  fi
+  die "no database available: set DATABASE_URL in ${CONFIG_FILE#$ROOT/}, install docker, or install node for PGlite"
 }
 
 # --- lifecycle ------------------------------------------------------------
