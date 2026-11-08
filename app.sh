@@ -7,6 +7,7 @@
 #   ./app.sh --db --seed     ... and replace its contents with the demo fixture
 #   ./app.sh --install       install dependencies, then exit
 #   ./app.sh --lan           listen on 0.0.0.0 so other machines can reach it
+#   ./app.sh --stop          kill this app's processes that this shell can see
 #   ./app.sh --mock          ignore any configured database
 #   ./app.sh --pglite        ignore DATABASE_URL and use PGlite anyway
 #   ./app.sh --no-install    never install anything, fail if something is missing
@@ -43,6 +44,7 @@ for arg in "$@"; do
     --install) WANT_INSTALL_ONLY=1 ;;
     --mock) FORCE_MOCK=1 ;;
     --lan) LAN=1 ;;
+    --stop) STOP=1 ;;
     --pglite) FORCE_PGLITE=1 ;;
     --no-install) ALLOW_INSTALL=0 ;;
     -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -56,6 +58,17 @@ ok()   { printf '\033[1;32m✓\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
+
+if [ "${STOP:-0}" = "1" ]; then
+  # Only what this namespace can see: a process started from another shell or
+  # another proot is invisible here, and no /proc/net access is available to
+  # find it by port without root.
+  for pattern in '\.bin/api' 'exe/api' 'vite'; do
+    pkill -f "$pattern" 2>/dev/null && echo "stopped: $pattern" || true
+  done
+  echo "done (processes outside this shell's view are not affected)"
+  exit 0
+fi
 
 # --- configuration ------------------------------------------------------
 # .secrets/app.env is the single place for the DSN and the device passwords.
@@ -399,9 +412,12 @@ fi
 # The address another machine should use, when we know it.
 LAN_IP=""
 if [ "$LAN" = "1" ]; then
-  LAN_IP="$(ip -4 addr show 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | grep -v '^127\.' | head -1)"
-  [ -n "$LAN_IP" ] || LAN_IP="$(ifconfig 2>/dev/null | awk '/inet /{print $2}' | grep -v '^127\.' | head -1)"
-  [ -n "$LAN_IP" ] || LAN_IP="$(getprop dhcp.wlan0.ipaddress 2>/dev/null)"
+  # `X="$(missing-cmd)"` returns 127, and set -e aborts the script there —
+  # which killed a healthy API two steps before the banner. Every probe here is
+  # best-effort and must end with || true.
+  LAN_IP="$(ip -4 addr show 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | grep -v '^127\.' | head -1 || true)"
+  [ -n "$LAN_IP" ] || LAN_IP="$(ifconfig 2>/dev/null | awk '/inet /{print $2}' | grep -v '^127\.' | head -1 || true)"
+  [ -n "$LAN_IP" ] || LAN_IP="$(getprop dhcp.wlan0.ipaddress 2>/dev/null || true)"
   if [ -z "$LAN_IP" ]; then
     warn "could not detect this machine's IP — look it up in Android Wi-Fi settings"
   fi
