@@ -169,16 +169,44 @@ resolve_database() {
     return
   fi
 
+  # A Postgres that is already listening beats starting anything. Falling
+  # through to PGlite here would look exactly like data loss: the app would come
+  # up with an empty database while the real one sits on 5432.
+  if command -v pg_isready >/dev/null 2>&1 && pg_isready -h 127.0.0.1 -p 5432 >/dev/null 2>&1; then
+    die "a Postgres is already accepting connections on 127.0.0.1:5432.
+
+     Point the script at it instead of starting another:
+       export DATABASE_URL=\"postgres://oltmon:<password>@127.0.0.1:5432/oltmon?sslmode=disable\"
+       ./app.sh --db
+     (add that export to ~/.bashrc so it survives a new shell)"
+  fi
+
+  # Docker only when the compose plugin actually exists. The CLI alone is common
+  # on Termux and \"docker compose\" then fails with a flag error.
   if have docker && [ -f "$ROOT/db/docker-compose.yml" ]; then
-    step "starting Postgres with docker compose"
-    (cd "$ROOT/db" && docker compose up -d) || die "docker compose failed"
-    DATABASE_URL="postgres://oltmon:oltmon@localhost:5432/oltmon?sslmode=disable"
-    for _ in $(seq 1 30); do
-      db_ready "$DATABASE_URL" && break
-      sleep 1
-    done
-    DSN_MODE="docker"
-    return
+    if (cd "$ROOT/db" && docker compose version >/dev/null 2>&1); then
+      step "starting Postgres with docker compose"
+      (cd "$ROOT/db" && docker compose up -d) || die "docker compose failed"
+      DATABASE_URL="postgres://oltmon:oltmon@localhost:5432/oltmon?sslmode=disable"
+      for _ in $(seq 1 30); do
+        db_ready "$DATABASE_URL" && break
+        sleep 1
+      done
+      DSN_MODE="docker"
+      return
+    fi
+    if command -v docker-compose >/dev/null 2>&1; then
+      step "starting Postgres with docker-compose"
+      (cd "$ROOT/db" && docker-compose up -d) || die "docker-compose failed"
+      DATABASE_URL="postgres://oltmon:oltmon@localhost:5432/oltmon?sslmode=disable"
+      for _ in $(seq 1 30); do
+        db_ready "$DATABASE_URL" && break
+        sleep 1
+      done
+      DSN_MODE="docker-compose"
+      return
+    fi
+    warn "docker is installed but the compose plugin is not — skipping it"
   fi
 
   if have node; then

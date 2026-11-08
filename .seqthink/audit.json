@@ -1,0 +1,58 @@
+{
+ "session": "audit",
+ "total": 5,
+ "current_branch": "main",
+ "done": true,
+ "steps": [
+  {
+   "n": 1,
+   "branch": "main",
+   "thought": "Question 1: how much of the platform exists? Measure, do not estimate: count Go/TS lines, tests, routes, and which spec pages are real vs placeholder.",
+   "uncertainty": false,
+   "files": [],
+   "revises": null,
+   "parent": null,
+   "ts": "2026-11-07T23:26:31+00:00"
+  },
+  {
+   "n": 2,
+   "branch": "main",
+   "thought": "Measured: 7,948 lines Go/SQL, 11,230 lines frontend, 57 Go tests, 18 routes, 32 API handlers. Built and verified against a real device: auth+roles, inventory CRUD+credentials, collection (version/time/status/optics/identity), ingest, logs. Fixture-backed or missing: incidents, reports, optical page, collection health, diagnostics console, settings writes, 2FA, lockout, multi-vendor adapters, thresholds by model.",
+   "uncertainty": false,
+   "files": [],
+   "revises": null,
+   "parent": null,
+   "ts": "2026-11-07T23:28:45+00:00"
+  },
+  {
+   "n": 3,
+   "branch": "main",
+   "thought": "Security: npm audit = 3 moderate, 0 high/critical (react-router open redirect + SSR hydration CVE, minimatch dev-only DoS). Go govulncheck = 52 reachable, but 36 are stdlib at go1.22.2 — the sandbox toolchain, fixed long before the Go 1.27 used in Termux. 12 are real modules: x/crypto 0.27 (10, incl. SSH DoS) and x/text 0.18 (2).",
+   "uncertainty": false,
+   "files": [
+    "go.mod"
+   ],
+   "revises": null,
+   "parent": null,
+   "ts": "2026-11-07T23:28:46+00:00"
+  },
+  {
+   "n": 4,
+   "branch": "main",
+   "thought": "Verdict: GitHub cannot be read unauthenticated (401 on dependabot alerts), so the local audits are the evidence. None of the findings is critical for this deployment; the two real risks are both client-side-ish: an SSH DoS when dialling a hostile server, and an open redirect that needs an attacker-controlled link target we do not have. Fix by bumping x/crypto and x/text, and decide on react-router 7 separately.",
+   "uncertainty": false,
+   "files": [],
+   "revises": null,
+   "parent": null,
+   "ts": "2026-11-07T23:28:46+00:00"
+  }
+ ],
+ "branches": {
+  "main": [
+   1,
+   2,
+   3,
+   4
+  ]
+ }
+}
