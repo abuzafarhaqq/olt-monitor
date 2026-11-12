@@ -32,8 +32,12 @@ type SSHConfig struct {
 	CLIPassword    string
 	EnablePassword string
 
-	Timeout    time.Duration
-	KnownHosts string
+	// Timeout bounds dialling and waiting for a prompt: seconds.
+	Timeout time.Duration
+	// CommandTimeout bounds one command's output. A 25,000-ONU table takes
+	// minutes to print, so the prompt timeout cannot serve both purposes.
+	CommandTimeout time.Duration
+	KnownHosts     string
 	// Prompt marks the end of a command's output. An EPON CLI is character mode,
 	// so "finished" means the prompt came back — not EOF.
 	Prompt *regexp.Regexp
@@ -44,11 +48,12 @@ type SSHConfig struct {
 var DefaultPrompt = regexp.MustCompile(`[#>]\s*$`)
 
 type SSHSession struct {
-	client  *ssh.Client
-	session *ssh.Session
-	stdin   io.WriteCloser
-	prompt  *regexp.Regexp
-	timeout time.Duration
+	client     *ssh.Client
+	session    *ssh.Session
+	stdin      io.WriteCloser
+	prompt     *regexp.Regexp
+	timeout    time.Duration
+	cmdTimeout time.Duration
 
 	cliUser        string
 	cliPassword    string
@@ -121,8 +126,13 @@ func DialSSH(ctx context.Context, cfg SSHConfig) (*SSHSession, error) {
 		return nil, fmt.Errorf("stdin: %w", err)
 	}
 
+	cmdTimeout := cfg.CommandTimeout
+	if cmdTimeout == 0 {
+		cmdTimeout = timeout
+	}
+
 	s := &SSHSession{
-		client: client, session: session, stdin: stdin, timeout: timeout,
+		client: client, session: session, stdin: stdin, timeout: timeout, cmdTimeout: cmdTimeout,
 		cliUser: cfg.CLIUser, cliPassword: cfg.CLIPassword, enablePassword: cfg.EnablePassword,
 	}
 	if cfg.Prompt != nil {
@@ -206,7 +216,7 @@ func (s *SSHSession) awaitEcho(ctx context.Context, line string) error {
 	// The window is the command timeout, not a fixed few seconds: `show onu
 	// opm-diag …` polls every ONU before printing anything, and a short window
 	// reports "no echo" for a command that is simply still running.
-	deadline := time.Now().Add(s.timeout)
+	deadline := time.Now().Add(s.cmdTimeout)
 	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -219,7 +229,7 @@ func (s *SSHSession) awaitEcho(ctx context.Context, line string) error {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("device did not echo %q back within %s (saw %q)", line, s.timeout, tail(seen, 80))
+			return fmt.Errorf("device did not echo %q back within %s (saw %q)", line, s.cmdTimeout, tail(seen, 80))
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -324,7 +334,7 @@ func (s *SSHSession) Run(ctx context.Context, line string) (string, error) {
 		return s.snapshot(), err
 	}
 
-	deadline := time.Now().Add(s.timeout)
+	deadline := time.Now().Add(s.cmdTimeout)
 	pages := 0
 
 	for {
@@ -348,7 +358,7 @@ func (s *SSHSession) Run(ctx context.Context, line string) (string, error) {
 
 		if time.Now().After(deadline) {
 			// Timeout is a result, not a crash: the partial output is evidence.
-			return stripPager(output), fmt.Errorf("timed out after %s waiting for the prompt", s.timeout)
+			return stripPager(output), fmt.Errorf("timed out after %s waiting for the prompt", s.cmdTimeout)
 		}
 
 		trimmed := trimRight(output)

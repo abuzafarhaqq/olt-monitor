@@ -39,7 +39,10 @@ type Service struct {
 
 	// AllowRun is the safety switch: false means "report the plan, dial nothing".
 	AllowRun bool
-	Timeout  time.Duration
+	// Timeout is the whole-run budget; CommandTimeout is per command. A 25,000
+	// ONU estate prints megabytes and the two must not share one number.
+	Timeout        time.Duration
+	CommandTimeout time.Duration
 
 	Hub Hub
 
@@ -304,7 +307,11 @@ func (s *Service) execute(device Device, runID int64, ing collector.Ingest) {
 
 	timeout := s.Timeout
 	if timeout == 0 {
-		timeout = 2 * time.Minute
+		timeout = 45 * time.Minute
+	}
+	commandTimeout := s.CommandTimeout
+	if commandTimeout == 0 {
+		commandTimeout = 5 * time.Minute
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -344,7 +351,7 @@ func (s *Service) execute(device Device, runID int64, ing collector.Ingest) {
 	session, err := collector.DialSSH(ctx, collector.SSHConfig{
 		Host: device.ManagementAddress, Port: device.ManagementPort, User: username,
 		Password: password, CLIUser: username, CLIPassword: cliPass, EnablePassword: enablePass,
-		Timeout: 20 * time.Second, KnownHosts: s.KnownHosts,
+		Timeout: 20 * time.Second, CommandTimeout: commandTimeout, KnownHosts: s.KnownHosts,
 	})
 	if err != nil {
 		result, reason = "failed", "connect: "+err.Error()

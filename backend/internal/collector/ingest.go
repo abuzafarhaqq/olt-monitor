@@ -283,7 +283,9 @@ func (in Ingest) StartRun(ctx context.Context, oltID string) (int64, error) {
 }
 
 // Append writes evidence and rows into an existing run.
-func (in Ingest) Append(ctx context.Context, runID int64, oltID string, at time.Time, jobs []Job) error {
+// appendSerial writes every row in one transaction. Fine for a CLI run of a
+// few hundred ONUs; the estate path uses Append (ingest_batch.go).
+func (in Ingest) appendSerial(ctx context.Context, runID int64, oltID string, at time.Time, jobs []Job) error {
 	tx, err := in.Pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
