@@ -5,6 +5,8 @@ import { DataTable, type Column } from "../../components/common/DataTable";
 import { FilterBar, Select, TextInput } from "../../components/common/FilterBar";
 import { FreshnessIndicator } from "../../components/common/FreshnessIndicator";
 import { PageHeader } from "../../components/common/PageHeader";
+import { PermissionGate } from "../../components/common/PermissionGate";
+import { useAuth } from "../../app/AuthContext";
 import { CollectDrawer } from "./CollectDrawer";
 import { CommandsDrawer } from "./CommandsDrawer";
 import { deleteOlt } from "../../services/oltApi";
@@ -22,6 +24,11 @@ import {
 
 export function OltInventoryPage() {
   const { data, loading, error, reload } = useOverview();
+  const { can } = useAuth();
+  // The API enforces these; the page must not offer buttons that can only fail.
+  const canRun = can("diagnostics.run");
+  const canReadDiagnostics = can("diagnostics.read");
+  const canManage = can("device.manage");
   const [filters, setFilters] = useState<OltFilters>(EMPTY_OLT_FILTERS);
   const [collectFor, setCollectFor] = useState<OltRow | null>(null);
   const [collectMode, setCollectMode] = useState<"collect" | "crawl">("collect");
@@ -122,45 +129,62 @@ export function OltInventoryPage() {
         }
         return (
           <div className="row-actions">
-            <button
-              type="button"
-              className="btn btn--small"
-              onClick={() => {
-                setCollectMode("collect");
-                setCollectFor(row);
-              }}
-              title="Show the commands, then collect from this OLT"
-            >
-              Refresh
-            </button>
-            <button
-              type="button"
-              className="btn btn--small"
-              onClick={() => {
-                setCollectMode("crawl");
-                setCollectFor(row);
-              }}
-              title="Discover this device's CLI with '?' — executes nothing"
-            >
-              Crawl
-            </button>
-            <button
-              type="button"
-              className="btn btn--small"
-              onClick={() => setCommandsFor(row)}
-              title="Commands found by the last crawl"
-            >
-              Cmds
-            </button>
+            {canRun ? (
+              <>
+                <button
+                  type="button"
+                  className="btn btn--small"
+                  onClick={() => {
+                    setCollectMode("collect");
+                    setCollectFor(row);
+                  }}
+                  title="Show the commands, then collect from this OLT"
+                >
+                  Refresh
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--small"
+                  onClick={() => {
+                    setCollectMode("crawl");
+                    setCollectFor(row);
+                  }}
+                  title="Discover this device's CLI with '?' — executes nothing"
+                >
+                  Crawl
+                </button>
+              </>
+            ) : null}
+
+            {canReadDiagnostics ? (
+              <button
+                type="button"
+                className="btn btn--small"
+                onClick={() => setCommandsFor(row)}
+                title="Commands found by the last crawl"
+              >
+                Cmds
+              </button>
+            ) : null}
+
             <Link className="btn btn--small" to={`/olts/${olt.id}`}>
               Open
             </Link>
-            <Link className="btn btn--small" to={`/olts/${olt.id}/edit`}>
-              Edit
-            </Link>
-            <button type="button" className="btn btn--small" onClick={() => setConfirmDelete(olt.id)}>
-              Delete
-            </button>
+
+            {canManage ? (
+              <>
+                <Link className="btn btn--small" to={`/olts/${olt.id}/edit`}>
+                  Edit
+                </Link>
+                <button
+                  type="button"
+                  className="btn btn--small"
+                  onClick={() => setConfirmDelete(olt.id)}
+                >
+                  Delete
+                </button>
+              </>
+            ) : null}
           </div>
         );
       },
@@ -174,9 +198,11 @@ export function OltInventoryPage() {
         subtitle={`${rows.length} devices · ${data.olts.filter((olt) => olt.reachable).length} reachable`}
         isMock={USE_MOCK_API}
         actions={
-          <Link className="btn btn--primary" to="/olts/new">
-            Add OLT
-          </Link>
+          <PermissionGate permission="device.manage">
+            <Link className="btn btn--primary" to="/olts/new">
+              Add OLT
+            </Link>
+          </PermissionGate>
         }
       />
 
