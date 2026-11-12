@@ -7,7 +7,6 @@
  */
 
 import type {
-  CollectionHealthResponse,
   DiagnosticResult,
   CollectionJob,
   Incident,
@@ -115,15 +114,10 @@ export const api = {
   incidents: () => request<Incident[]>("/incidents"),
   incident: (id: string) => request<Incident>(`/incidents/${id}`),
   collectionJobs: () => request<CollectionJob[]>("/collection/jobs"),
-  collectionHealth: () => request<CollectionHealthResponse>("/collection/health"),
-  acknowledgeIncident: (id: string) =>
-    request<Incident>(`/incidents/${id}/acknowledge`, { method: "POST", token: null }),
   runDiagnostic: (oltId: string, commandId: string) =>
     request<DiagnosticResult>(`/olts/${oltId}/diagnostics`, {
       method: "POST",
       body: { commandId },
       token: null,
     }),
-  addIncidentNote: (id: string, text: string) =>
-    request<Incident>(`/incidents/${id}/notes`, { method: "POST", body: { text }, token: null }),
 };

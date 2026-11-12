@@ -45,6 +45,12 @@ type Service struct {
 	CommandTimeout time.Duration
 
 	Hub Hub
+	// FallbackUser/FallbackPass are used when no credential is stored for the
+	// device — the same account the CLI takes from .secrets/olt.env. Without
+	// this the UI fails with "credential: not found" and looks like a broken
+	// collection rather than an unset secret.
+	FallbackUser string
+	FallbackPass string
 
 	mu      sync.Mutex
 	running map[string]bool
@@ -340,9 +346,15 @@ func (s *Service) execute(device Device, runID int64, ing collector.Ingest) {
 
 	username, password, err := s.Secrets.Resolve(ctx, device.ID)
 	if err != nil {
-		result, reason = "failed", "credential: "+err.Error()
-		publish("error", reason)
-		return
+		if s.FallbackUser == "" || s.FallbackPass == "" {
+			result, reason = "failed", fmt.Sprintf(
+				"no stored credential for %s — set it on the device page, or set OLT_USER and OLT_PASSWORD",
+				device.Name)
+			publish("error", reason)
+			return
+		}
+		username, password = s.FallbackUser, s.FallbackPass
+		publish("info", "using credentials from the environment (no stored credential)")
 	}
 
 	cliPass := firstNonEmpty(s.CLIPass, password)

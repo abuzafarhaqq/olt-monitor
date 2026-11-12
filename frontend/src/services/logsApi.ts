@@ -6,7 +6,7 @@ export interface RunSummary {
   oltId: string;
   oltName: string;
   jobType: string;
-  result: "successful" | "partial" | "failed" | "skipped";
+  result: "running" | "successful" | "partial" | "failed" | "skipped";
   startedAt: string;
   finishedAt: string | null;
   durationMs: number | null;

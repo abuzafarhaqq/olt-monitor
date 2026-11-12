@@ -87,10 +87,14 @@ func main() {
 
 		// Collection service: the UI's "refresh" button ends here.
 		collectSvc := &collecting.Service{
-			Pool:       pg.Pool(),
-			CLIPass:    os.Getenv("OLT_CLI_PASSWORD"),
-			EnablePass: os.Getenv("OLT_ENABLE_PASSWORD"),
-			AllowRun:   os.Getenv("OLT_ALLOW_COLLECT") != "false",
+			Pool:    pg.Pool(),
+			CLIPass: os.Getenv("OLT_CLI_PASSWORD"),
+			// Same account the CLI uses, so a device without a stored credential
+			// still collects — and says so in the stream.
+			FallbackUser: os.Getenv("OLT_USER"),
+			FallbackPass: os.Getenv("OLT_PASSWORD"),
+			EnablePass:   os.Getenv("OLT_ENABLE_PASSWORD"),
+			AllowRun:     os.Getenv("OLT_ALLOW_COLLECT") != "false",
 			// Whole-run budget and per-command budget: a 25,000-ONU estate
 			// prints megabytes and takes minutes per table.
 			Timeout:        45 * time.Minute,

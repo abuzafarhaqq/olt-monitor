@@ -9,6 +9,8 @@ import { USE_MOCK_API } from "../../services/client";
 import { formatDateTime, formatDuration } from "../../utils/format";
 
 const RESULT_TONE: Record<RunSummary["result"], string> = {
+  // A run in flight is "collecting" (blue), not a failure and not a success.
+  running: "badge--info",
   successful: "badge--online",
   partial: "badge--warning",
   failed: "badge--offline",

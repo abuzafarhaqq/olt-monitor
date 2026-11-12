@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../app/AuthContext";
 import { useLiveEvents } from "../../hooks/useLiveEvents";
 import { MOCK_OVERVIEW } from "../../mock/mockData";
+import { USE_MOCK_API } from "../../services/client";
 import { ROLES } from "../../services/auth";
 import { formatRelative } from "../../utils/format";
 
@@ -44,7 +45,7 @@ export function Topbar({ navOpen, onToggleNav }: TopbarProps) {
       <div className="topbar__meta">
         <span className="topbar__status">
           <span className="topbar__dot topbar__dot--mock" aria-hidden="true" />
-          API: mock
+          API: {USE_MOCK_API ? "mock" : "live"}
         </span>
         <span className="topbar__status" title={lastEvent?.message ?? "No live event yet"}>
           <span
