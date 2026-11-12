@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { can, type Permission } from "../services/auth";
+import { getSetupStatus } from "../services/setupApi";
 import {
   currentUser,
   login as loginRequest,
@@ -12,6 +13,8 @@ type AuthStatus = "loading" | "anonymous" | "authenticated";
 interface AuthState {
   user: SessionUser | null;
   status: AuthStatus;
+  /** No account exists yet: the first-run setup page is the only way in. */
+  setupRequired: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   can: (permission: Permission) => boolean;
@@ -22,6 +25,7 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
+  const [setupRequired, setSetupRequired] = useState(false);
 
   // Restore the session once on mount: a reload must not silently sign someone
   // out, and a stale cookie must not silently sign them in.
@@ -29,10 +33,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let alive = true;
 
     currentUser()
-      .then((session) => {
+      .then(async (session) => {
         if (!alive) return;
         setUser(session);
         setStatus(session === null ? "anonymous" : "authenticated");
+        if (session === null) {
+          setSetupRequired(await getSetupStatus());
+        }
       })
       .catch(() => {
         if (!alive) return;
@@ -49,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       status,
+      setupRequired,
       login: async (username: string, password: string) => {
         const session = await loginRequest(username, password);
         setUser(session);
@@ -63,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // controls an anonymous viewer must never see.
       can: (permission: Permission) => (user === null ? false : can(user.role, permission)),
     }),
-    [user, status],
+    [user, status, setupRequired],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

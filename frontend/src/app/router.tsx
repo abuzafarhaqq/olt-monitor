@@ -3,6 +3,7 @@ import { AppLayout } from "../components/layout/AppLayout";
 import { RequireAuth } from "./RequireAuth";
 import { ForgotPasswordPage } from "../features/auth/ForgotPasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
+import { SetupPage } from "../features/auth/SetupPage";
 import { ALL_NAV_ITEMS } from "../constants/navigation";
 import { CollectionHealthPage } from "../features/collection/CollectionHealthPage";
 import { DiagnosticsConsolePage } from "../features/console/DiagnosticsConsolePage";
@@ -48,6 +49,7 @@ export function AppRouter() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/setup" element={<SetupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route
           element={

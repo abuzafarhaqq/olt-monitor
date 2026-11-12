@@ -110,3 +110,10 @@ func NormaliseRole(role string) (string, bool) {
 		return "", false
 	}
 }
+
+// NormaliseRoleOrAdmin exists for the bootstrap path: the first account is an
+// administrator by definition, and the normaliser keeps the string canonical.
+func NormaliseRoleOrAdmin() string {
+	role, _ := NormaliseRole("administrator")
+	return role
+}

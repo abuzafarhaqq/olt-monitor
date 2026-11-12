@@ -58,6 +58,43 @@ func (s *Server) requireAuthConfigured(w http.ResponseWriter) bool {
 	return true
 }
 
+// issueSession creates the session row and sets the cookie. Shared by login and
+// the first-run setup, so both produce an identical session.
+func (s *Server) issueSession(w http.ResponseWriter, r *http.Request, user store.User) error {
+	token, hash, err := auth.NewSessionToken()
+	if err != nil {
+		s.log.Error("session token", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal", "could not start a session")
+		return err
+	}
+
+	expiresAt := time.Now().Add(auth.SessionTTL)
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if err := s.auth.CreateSession(r.Context(), user.ID, hash, expiresAt, ip, r.UserAgent()); err != nil {
+		s.handleStoreError(w, err)
+		return err
+	}
+	if err := s.auth.TouchLogin(r.Context(), user.ID); err != nil {
+		s.log.Warn("touch login", "error", err)
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     SessionCookieName,
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		// Secure whenever the request arrived over TLS, or through a proxy that
+		// says it did. A plain-HTTP deployment stays broken rather than sending
+		// the cookie in the clear.
+		Secure:   isSecureRequest(r),
+		SameSite: http.SameSiteStrictMode,
+		Expires:  expiresAt,
+		MaxAge:   int(auth.SessionTTL / time.Second),
+	})
+
+	return nil
+}
+
 // login answers with the same 401 and the same wording for an unknown user, a
 // wrong password and a disabled account. Anything more specific is a user
 // enumeration oracle.
@@ -90,36 +127,9 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, hash, err := auth.NewSessionToken()
-	if err != nil {
-		s.log.Error("session token", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal", "could not start a session")
+	if err := s.issueSession(w, r, user); err != nil {
 		return
 	}
-
-	expiresAt := time.Now().Add(auth.SessionTTL)
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	if err := s.auth.CreateSession(r.Context(), user.ID, hash, expiresAt, ip, r.UserAgent()); err != nil {
-		s.handleStoreError(w, err)
-		return
-	}
-	if err := s.auth.TouchLogin(r.Context(), user.ID); err != nil {
-		s.log.Warn("touch login", "error", err)
-	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     SessionCookieName,
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		// Secure whenever the request arrived over TLS, or through a proxy that
-		// says it did. A plain-HTTP deployment stays broken rather than sending
-		// the cookie in the clear.
-		Secure:   isSecureRequest(r),
-		SameSite: http.SameSiteStrictMode,
-		Expires:  expiresAt,
-		MaxAge:   int(auth.SessionTTL / time.Second),
-	})
 
 	writeJSON(w, http.StatusOK, toSessionUser(user))
 }

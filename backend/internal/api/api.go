@@ -65,6 +65,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/collection/jobs", s.guardRead(s.collectionJobs))
 	mux.HandleFunc("GET /api/v1/stream", s.stream)
 
+	// First-run setup: available only while no account exists.
+	mux.HandleFunc("GET /api/v1/setup/status", s.setupStatus)
+	mux.HandleFunc("POST /api/v1/setup", s.setup)
+
 	mux.HandleFunc("POST /api/v1/auth/login", s.login)
 	mux.HandleFunc("POST /api/v1/auth/logout", s.logout)
 	mux.HandleFunc("GET /api/v1/auth/me", s.requireSession(s.me))

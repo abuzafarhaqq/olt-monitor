@@ -11,7 +11,7 @@ import { useAuth } from "./AuthContext";
  * that fetch data.
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { status } = useAuth();
+  const { status, setupRequired } = useAuth();
   const location = useLocation();
 
   if (status === "loading") {
@@ -19,6 +19,10 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   if (status === "anonymous") {
+    // No accounts exist yet: there is nothing to sign in to.
+    if (setupRequired) {
+      return <Navigate to="/setup" replace />;
+    }
     // Remember where the user was headed so login can return them there.
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }

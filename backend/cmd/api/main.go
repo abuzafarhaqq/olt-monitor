@@ -24,6 +24,7 @@ import (
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/secrets"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/memory"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
+	"github.com/abuzafarhaqq/olt-monitor/db"
 )
 
 func firstNonEmpty(values ...string) string {
@@ -69,6 +70,17 @@ func main() {
 		}
 		defer pg.Close()
 		logger.Info("connected to postgres")
+
+		// Migrations belong to the binary, not to a shell: a user who only ever
+		// opens the browser must never be asked to run one.
+		migrateCtx, migrateCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		if err := postgres.Migrate(migrateCtx, pg.Pool(), db.FS); err != nil {
+			migrateCancel()
+			logger.Error("migrations failed", "error", err)
+			os.Exit(1)
+		}
+		migrateCancel()
+		logger.Info("schema up to date")
 		server := api.NewServer(pg, logger).WithBuild(buildTime).WithAuth(pg).WithAudit(pg).WithDevices(pg).WithUsers(pg)
 
 		var creds *secrets.Service
