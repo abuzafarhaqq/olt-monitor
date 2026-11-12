@@ -25,16 +25,21 @@ func (in Ingest) RecordDeviceState(ctx context.Context, oltID string, state Devi
 		quality = "trusted"
 	}
 
+	// Device facts (firmware, hardware, clock) are only overwritten by a run that
+	// could actually talk to the device. A failed attempt updates reachable,
+	// observed_at and the status, and leaves the last known facts alone.
 	_, err := in.Pool.Exec(ctx, `
 		INSERT INTO olt_state (olt_id, reachable, firmware, hardware_version, device_time,
-		                       clock_quality, observed_at, collection_status)
-		VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), NULL, $5::timestamp_quality, $6, $7::collection_status)
+		                       clock_quality, observed_at, last_success_at, collection_status)
+		VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), NULL, $5::timestamp_quality, $6,
+		        CASE WHEN $2 THEN $6 ELSE NULL END, $7::collection_status)
 		ON CONFLICT (olt_id) DO UPDATE
 		   SET reachable = EXCLUDED.reachable,
-		       firmware = COALESCE(EXCLUDED.firmware, olt_state.firmware),
-		       hardware_version = COALESCE(EXCLUDED.hardware_version, olt_state.hardware_version),
-		       clock_quality = EXCLUDED.clock_quality,
+		       firmware = CASE WHEN EXCLUDED.reachable THEN COALESCE(EXCLUDED.firmware, olt_state.firmware) ELSE olt_state.firmware END,
+		       hardware_version = CASE WHEN EXCLUDED.reachable THEN COALESCE(EXCLUDED.hardware_version, olt_state.hardware_version) ELSE olt_state.hardware_version END,
+		       clock_quality = CASE WHEN EXCLUDED.reachable THEN EXCLUDED.clock_quality ELSE olt_state.clock_quality END,
 		       observed_at = EXCLUDED.observed_at,
+		       last_success_at = COALESCE(EXCLUDED.last_success_at, olt_state.last_success_at),
 		       collection_status = EXCLUDED.collection_status`,
 		oltID, state.Reachable, state.Firmware, state.Hardware, quality, at, state.CollectionStatus)
 	if err != nil {

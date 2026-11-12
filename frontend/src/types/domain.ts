@@ -133,6 +133,8 @@ export interface Olt {
   ponCount: number;
   lastCollection: DeviceTimestamps | null;
   collectionStatus: CollectionStatus;
+  /** Last time the device answered. lastCollection.ingestedAt is the last attempt. */
+  lastSuccessAt?: string | null;
 }
 
 /** ONU counts per PON. `unknown` is a first-class bucket, never folded into offline. */
@@ -155,6 +157,8 @@ export interface Pon {
   /** Last successful collection for this port — per PON, not per OLT. */
   lastCollection: DeviceTimestamps | null;
   collectionStatus: CollectionStatus;
+  /** Last time the device answered. lastCollection.ingestedAt is the last attempt. */
+  lastSuccessAt?: string | null;
 }
 
 export interface Onu {

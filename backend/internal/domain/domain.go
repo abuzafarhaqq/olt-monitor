@@ -74,6 +74,10 @@ type Olt struct {
 	HostKeyFingerprint *string           `json:"hostKeyFingerprint"`
 	LastCollection     *DeviceTimestamps `json:"lastCollection"`
 	CollectionStatus   CollectionStatus  `json:"collectionStatus"`
+	// LastSuccessAt is when the device last answered. LastCollection.IngestedAt
+	// is the last *attempt*, which may have been a failure — two different facts
+	// that used to share one field.
+	LastSuccessAt *time.Time `json:"lastSuccessAt"`
 }
 
 // OnuCounts keeps unknown as a first-class bucket.

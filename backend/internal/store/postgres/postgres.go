@@ -66,7 +66,7 @@ SELECT o.id, o.name, o.vendor, o.model, o.technology,
        -- A device that was never collected has no successful status; 'failed'
        -- is the honest value, not 'successful' and not NULL.
        COALESCE(st.collection_status::text, 'failed'),
-       o.trust_host_key, o.host_key_fingerprint
+       o.trust_host_key, o.host_key_fingerprint, st.last_success_at
 FROM olts o
 LEFT JOIN olt_state st ON st.olt_id = o.id
 WHERE o.enabled
@@ -211,7 +211,7 @@ func (s *Store) Olts(ctx context.Context) ([]domain.Olt, error) {
 			&olt.Reachable, &olt.Firmware, &olt.HardwareVersion,
 			&uptime, &deviceTime, &observedAt, &quality,
 			&olt.PonCount, &olt.CollectionStatus,
-			&olt.TrustHostKey, &olt.HostKeyFingerprint,
+			&olt.TrustHostKey, &olt.HostKeyFingerprint, &olt.LastSuccessAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan olt: %w", err)
 		}

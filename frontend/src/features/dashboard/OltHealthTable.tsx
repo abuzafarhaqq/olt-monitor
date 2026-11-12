@@ -2,7 +2,7 @@ import { CollectionBadge } from "../../components/common/CollectionBadge";
 import { DataTable, type Column } from "../../components/common/DataTable";
 import { FreshnessIndicator } from "../../components/common/FreshnessIndicator";
 import type { Onu, Olt } from "../../types/domain";
-import { formatCount } from "../../utils/format";
+import { formatCount, formatRelative } from "../../utils/format";
 
 interface OltHealthTableProps {
   olts: Olt[];
@@ -52,7 +52,27 @@ export function OltHealthTable({ olts, onus }: OltHealthTableProps) {
     {
       key: "lastCollection",
       header: "Last collection",
-      render: (olt) => <FreshnessIndicator timestamps={olt.lastCollection} />,
+      render: (olt) => {
+        // "just now" next to a year-2000 clock is two facts, not one: the last
+        // attempt was just now, the clock is from the last success.
+        const unhealthy = olt.collectionStatus === "failed" || olt.collectionStatus === "partial";
+        if (!unhealthy) {
+          return <FreshnessIndicator timestamps={olt.lastCollection} />;
+        }
+        return (
+          <div>
+            <div className="cell-sub">
+              attempt {olt.lastCollection === null ? "never" : formatRelative(olt.lastCollection.ingestedAt)}
+            </div>
+            <div className="cell-sub">
+              last success{" "}
+              {olt.lastSuccessAt === null || olt.lastSuccessAt === undefined
+                ? "never"
+                : formatRelative(olt.lastSuccessAt)}
+            </div>
+          </div>
+        );
+      },
     },
     {
       key: "collection",
