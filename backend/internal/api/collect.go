@@ -46,7 +46,7 @@ func (s *Server) deviceFor(r *http.Request) (collecting.Device, error) {
 	return collecting.Device{
 		ID: olt.ID, Name: olt.Name, Vendor: olt.Vendor, Model: olt.Model,
 		Technology: olt.Technology, ManagementAddress: olt.ManagementAddress,
-		ManagementPort: 22, Connection: olt.Connection,
+		ManagementPort: 22, Connection: olt.Connection, TrustHostKey: olt.TrustHostKey,
 	}, nil
 }
 
@@ -234,4 +234,59 @@ func (s *Server) runDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "evidence": evidence})
+}
+
+// CommandList is the read side of the crawled CLI tree.
+type CommandList interface {
+	ListCommands(ctx context.Context, oltID string) ([]postgres.DiscoveredCommand, error)
+}
+
+// WithCommandList enables the discovered-commands view.
+func (s *Server) WithCommandList(list CommandList) *Server {
+	s.commands = list
+	return s
+}
+
+// crawlOlt discovers the CLI tree and stores it. Asynchronous for the same reason
+// a collection is: a full walk takes minutes and must not hold a request open.
+func (s *Server) crawlOlt(w http.ResponseWriter, r *http.Request) {
+	if s.collector == nil {
+		writeError(w, http.StatusServiceUnavailable, "collector_disabled", "device access is not configured")
+		return
+	}
+
+	device, err := s.deviceFor(r)
+	if err != nil {
+		s.handleStoreError(w, err)
+		return
+	}
+
+	actor, _ := userFrom(r.Context())
+	runID, err := s.collector.StartCrawl(r.Context(), device, actor.Username)
+	if err != nil {
+		if errors.Is(err, collecting.ErrAlreadyRunning) {
+			writeError(w, http.StatusConflict, "already_running", err.Error())
+			return
+		}
+		writeError(w, http.StatusBadGateway, "crawl_failed", err.Error())
+		return
+	}
+
+	s.auditActor(r, "olt.crawl", device.ID, device.Name)
+	w.Header().Set("Location", fmt.Sprintf("/api/v1/collection/runs/%d/stream", runID))
+	writeJSON(w, http.StatusAccepted, map[string]any{"runId": runID, "stream": "sse"})
+}
+
+// listCommands returns what the last crawl found, read paths first.
+func (s *Server) listCommands(w http.ResponseWriter, r *http.Request) {
+	if s.commands == nil {
+		writeError(w, http.StatusServiceUnavailable, "commands_disabled", "command discovery is not configured")
+		return
+	}
+	commands, err := s.commands.ListCommands(r.Context(), r.PathValue("id"))
+	if err != nil {
+		s.handleStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, commands)
 }

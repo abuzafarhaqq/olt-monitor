@@ -132,3 +132,14 @@ func (s *Store) DeleteOlt(ctx context.Context, id string) error {
 	}
 	return nil
 }
+
+// SetHostKeyFingerprint records a key trusted on first contact, so the device
+// page can show it and a human can compare it.
+func (s *Store) SetHostKeyFingerprint(ctx context.Context, oltID, fingerprint string) error {
+	if _, err := s.pool.Exec(ctx, `
+		UPDATE olts SET host_key_fingerprint = $2, host_key_seen_at = now() WHERE id = $1`,
+		oltID, fingerprint); err != nil {
+		return fmt.Errorf("set host key fingerprint: %w", err)
+	}
+	return nil
+}

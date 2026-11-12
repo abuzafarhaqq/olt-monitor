@@ -6,6 +6,7 @@ import { FilterBar, Select, TextInput } from "../../components/common/FilterBar"
 import { FreshnessIndicator } from "../../components/common/FreshnessIndicator";
 import { PageHeader } from "../../components/common/PageHeader";
 import { CollectDrawer } from "./CollectDrawer";
+import { CommandsDrawer } from "./CommandsDrawer";
 import { deleteOlt } from "../../services/oltApi";
 import { ErrorState, LoadingState } from "../../components/common/States";
 import { useOverview } from "../../hooks/useResource";
@@ -23,6 +24,8 @@ export function OltInventoryPage() {
   const { data, loading, error, reload } = useOverview();
   const [filters, setFilters] = useState<OltFilters>(EMPTY_OLT_FILTERS);
   const [collectFor, setCollectFor] = useState<OltRow | null>(null);
+  const [collectMode, setCollectMode] = useState<"collect" | "crawl">("collect");
+  const [commandsFor, setCommandsFor] = useState<OltRow | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -122,10 +125,32 @@ export function OltInventoryPage() {
             <button
               type="button"
               className="btn btn--small"
-              onClick={() => setCollectFor(row)}
+              onClick={() => {
+                setCollectMode("collect");
+                setCollectFor(row);
+              }}
               title="Show the commands, then collect from this OLT"
             >
               Refresh
+            </button>
+            <button
+              type="button"
+              className="btn btn--small"
+              onClick={() => {
+                setCollectMode("crawl");
+                setCollectFor(row);
+              }}
+              title="Discover this device's CLI with '?' — executes nothing"
+            >
+              Crawl
+            </button>
+            <button
+              type="button"
+              className="btn btn--small"
+              onClick={() => setCommandsFor(row)}
+              title="Commands found by the last crawl"
+            >
+              Cmds
             </button>
             <Link className="btn btn--small" to={`/olts/${olt.id}`}>
               Open
@@ -213,8 +238,17 @@ export function OltInventoryPage() {
         <CollectDrawer
           oltId={collectFor.olt.id}
           oltName={collectFor.olt.name}
+          mode={collectMode}
           onClose={() => setCollectFor(null)}
           onDone={reload}
+        />
+      )}
+
+      {commandsFor === null ? null : (
+        <CommandsDrawer
+          oltId={commandsFor.olt.id}
+          oltName={commandsFor.olt.name}
+          onClose={() => setCommandsFor(null)}
         />
       )}
     </>

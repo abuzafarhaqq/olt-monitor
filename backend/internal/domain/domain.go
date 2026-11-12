@@ -56,20 +56,24 @@ type DeviceTimestamps struct {
 }
 
 type Olt struct {
-	ID                string            `json:"id"`
-	Name              string            `json:"name"`
-	Vendor            string            `json:"vendor"`
-	Model             string            `json:"model"`
-	Technology        string            `json:"technology"`
-	ManagementAddress string            `json:"managementAddress"`
-	Connection        string            `json:"connection"`
-	Reachable         bool              `json:"reachable"`
-	Firmware          string            `json:"firmware"`
-	HardwareVersion   string            `json:"hardwareVersion"`
-	UptimeSeconds     *int64            `json:"uptimeSeconds"`
-	PonCount          int               `json:"ponCount"`
-	LastCollection    *DeviceTimestamps `json:"lastCollection"`
-	CollectionStatus  CollectionStatus  `json:"collectionStatus"`
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	Vendor            string `json:"vendor"`
+	Model             string `json:"model"`
+	Technology        string `json:"technology"`
+	ManagementAddress string `json:"managementAddress"`
+	Connection        string `json:"connection"`
+	Reachable         bool   `json:"reachable"`
+	Firmware          string `json:"firmware"`
+	HardwareVersion   string `json:"hardwareVersion"`
+	UptimeSeconds     *int64 `json:"uptimeSeconds"`
+	PonCount          int    `json:"ponCount"`
+	// TrustHostKey accepts an unknown SSH host key on first contact and records
+	// its fingerprint; a changed key is still refused.
+	TrustHostKey       bool              `json:"trustHostKey"`
+	HostKeyFingerprint *string           `json:"hostKeyFingerprint"`
+	LastCollection     *DeviceTimestamps `json:"lastCollection"`
+	CollectionStatus   CollectionStatus  `json:"collectionStatus"`
 }
 
 // OnuCounts keeps unknown as a first-class bucket.
@@ -81,15 +85,19 @@ type OnuCounts struct {
 }
 
 type Pon struct {
-	ID                string            `json:"id"`
-	OltID             string            `json:"oltId"`
-	Name              string            `json:"name"`
-	Counts            OnuCounts         `json:"counts"`
-	LowOpticalCount   int               `json:"lowOpticalCount"`
-	DyingGaspCount24h int               `json:"dyingGaspCount24h"`
-	FlappingCount     int               `json:"flappingCount"`
-	LastCollection    *DeviceTimestamps `json:"lastCollection"`
-	CollectionStatus  CollectionStatus  `json:"collectionStatus"`
+	ID                string    `json:"id"`
+	OltID             string    `json:"oltId"`
+	Name              string    `json:"name"`
+	Counts            OnuCounts `json:"counts"`
+	LowOpticalCount   int       `json:"lowOpticalCount"`
+	DyingGaspCount24h int       `json:"dyingGaspCount24h"`
+	FlappingCount     int       `json:"flappingCount"`
+	// TrustHostKey accepts an unknown SSH host key on first contact and records
+	// its fingerprint; a changed key is still refused.
+	TrustHostKey       bool              `json:"trustHostKey"`
+	HostKeyFingerprint *string           `json:"hostKeyFingerprint"`
+	LastCollection     *DeviceTimestamps `json:"lastCollection"`
+	CollectionStatus   CollectionStatus  `json:"collectionStatus"`
 }
 
 type Onu struct {

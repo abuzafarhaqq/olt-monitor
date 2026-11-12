@@ -90,3 +90,16 @@ export async function getCollectionPlan(id: string): Promise<CollectionPlan> {
   }
   return request<CollectionPlan>(`/olts/${id}/collection-plan`);
 }
+
+export interface DiscoveredCommand {
+  path: string;
+  help: string;
+  kind: "read" | "action" | "param" | "unknown";
+  depth: number;
+}
+
+/** What the last crawl found on this device. */
+export async function listCommands(id: string): Promise<DiscoveredCommand[]> {
+  if (USE_MOCK_API) return [];
+  return request<DiscoveredCommand[]>(`/olts/${id}/commands`);
+}

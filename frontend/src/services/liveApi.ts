@@ -14,6 +14,14 @@ export async function startCollection(oltId: string): Promise<StartedRun> {
   return request<StartedRun>(`/olts/${oltId}/collect`, { method: "POST", timeoutMs: 15_000 });
 }
 
+/** Discovers the device's CLI tree with '?'. Executes nothing on the device. */
+export async function startCrawl(oltId: string): Promise<StartedRun> {
+  if (USE_MOCK_API) {
+    throw new Error("Crawling needs the API (set USE_MOCK_API = false).");
+  }
+  return request<StartedRun>(`/olts/${oltId}/crawl`, { method: "POST", timeoutMs: 15_000 });
+}
+
 export interface LiveEvent {
   seq: number;
   kind: "start" | "info" | "cmd" | "out" | "error" | "end" | "truncated";

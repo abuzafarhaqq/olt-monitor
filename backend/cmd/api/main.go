@@ -112,7 +112,9 @@ func main() {
 		}
 		hub := live.NewHub()
 		collectSvc.Hub = hub
-		server = server.WithCollector(collectSvc).WithLogs(pg).WithHub(hub)
+		collectSvc.Keys = pg
+		collectSvc.Commands = pg
+		server = server.WithCollector(collectSvc).WithLogs(pg).WithHub(hub).WithCommandList(pg)
 
 		handler = server.Routes()
 	}

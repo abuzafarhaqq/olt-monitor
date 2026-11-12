@@ -3,6 +3,7 @@ package collector
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -34,6 +35,10 @@ type SSHConfig struct {
 
 	// Timeout bounds dialling and waiting for a prompt: seconds.
 	Timeout time.Duration
+	// AcceptNewKey trusts an unknown host key and records its fingerprint via
+	// OnNewKey. Verification stays on: a key that changes later is a mismatch.
+	AcceptNewKey bool
+	OnNewKey     func(fingerprint string)
 	// CommandTimeout bounds one command's output. A 25,000-ONU table takes
 	// minutes to print, so the prompt timeout cannot serve both purposes.
 	CommandTimeout time.Duration
@@ -81,9 +86,37 @@ func DialSSH(ctx context.Context, cfg SSHConfig) (*SSHSession, error) {
 		return nil, fmt.Errorf("known_hosts %s: %w", cfg.KnownHosts, err)
 	}
 
-	hostKeyCallback, err := knownhosts.New(cfg.KnownHosts)
+	verify, err := knownhosts.New(cfg.KnownHosts)
 	if err != nil {
 		return nil, fmt.Errorf("parse known_hosts: %w", err)
+	}
+
+	hostKeyCallback := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		err := verify(hostname, remote, key)
+		if err == nil {
+			return nil
+		}
+
+		var keyErr *knownhosts.KeyError
+		if !errors.As(err, &keyErr) {
+			return err
+		}
+		// No entry at all: first contact. A mismatch (keyErr.Want non-empty) is a
+		// different thing and is never forgiven.
+		if len(keyErr.Want) > 0 || !cfg.AcceptNewKey {
+			return err
+		}
+
+		if cfg.OnNewKey != nil {
+			cfg.OnNewKey(ssh.FingerprintSHA256(key))
+		}
+		if cfg.KnownHosts != "" {
+			if file, ferr := os.OpenFile(cfg.KnownHosts, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); ferr == nil {
+				_, _ = fmt.Fprintln(file, knownhosts.Line([]string{hostname}, key))
+				_ = file.Close()
+			}
+		}
+		return nil
 	}
 
 	port := cfg.Port
