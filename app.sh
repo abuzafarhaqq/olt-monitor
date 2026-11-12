@@ -26,6 +26,9 @@ LOG_DIR="$ROOT/.logs"
 KEYS_DIR="$ROOT/.secrets"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+# vite.config.ts reads BACKEND_PORT to build its proxy target; without the
+# export the browser would keep talking to 8080 whatever port we started on.
+export BACKEND_PORT FRONTEND_PORT
 
 WANT_DB=0
 WANT_SEED=0

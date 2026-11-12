@@ -12,7 +12,11 @@ export default defineConfig({
     // talks to :5173, Vite forwards /api to the Go server.
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8080",
+        // Must follow the port the API actually listens on. Hardcoding 8080 here
+        // meant that running app.sh with BACKEND_PORT=8090 left the browser
+        // talking to whatever stale process still held 8080 — which answered
+        // 404 for routes it did not have and hung on the synchronous collect.
+        target: `http://127.0.0.1:${process.env.BACKEND_PORT ?? "8080"}`,
         changeOrigin: false,
       },
     },
