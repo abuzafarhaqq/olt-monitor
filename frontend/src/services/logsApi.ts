@@ -11,6 +11,8 @@ export interface RunSummary {
   finishedAt: string | null;
   durationMs: number | null;
   errorMessage: string | null;
+  /** Username that triggered the run; null for CLI runs. */
+  triggeredBy: string | null;
   evidenceCount: number;
 }
 

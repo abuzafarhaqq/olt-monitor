@@ -42,6 +42,16 @@ export function LogsPage() {
     },
     { key: "olt", header: "OLT", render: (run) => run.oltName },
     {
+      key: "actor",
+      header: "Triggered by",
+      render: (run) =>
+        run.triggeredBy === null ? (
+          <span className="cell-sub">cli</span>
+        ) : (
+          <span className="mono">{run.triggeredBy}</span>
+        ),
+    },
+    {
       key: "result",
       header: "Result",
       render: (run) => <span className={`badge ${RESULT_TONE[run.result]}`}>{run.result}</span>,

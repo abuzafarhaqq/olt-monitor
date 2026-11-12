@@ -271,12 +271,12 @@ func (in *Ingest) Close() {
 // StartRun inserts a run in the 'running' state and returns its id. The API
 // needs the id before the collection finishes, so the row cannot wait for the
 // result.
-func (in Ingest) StartRun(ctx context.Context, oltID string) (int64, error) {
+func (in Ingest) StartRun(ctx context.Context, oltID, triggeredBy string) (int64, error) {
 	var runID int64
 	if err := in.Pool.QueryRow(ctx, `
-		INSERT INTO collection_runs (olt_id, job_type, started_at, result, live)
-		VALUES ($1, 'full', now(), 'running', TRUE)
-		RETURNING id`, oltID).Scan(&runID); err != nil {
+		INSERT INTO collection_runs (olt_id, job_type, started_at, result, live, triggered_by)
+		VALUES ($1, 'full', now(), 'running', TRUE, NULLIF($2, ''))
+		RETURNING id`, oltID, triggeredBy).Scan(&runID); err != nil {
 		return 0, fmt.Errorf("start run: %w", err)
 	}
 	return runID, nil

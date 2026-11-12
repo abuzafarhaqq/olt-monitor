@@ -253,7 +253,7 @@ type Hub interface {
 // The request context is deliberately not used for the work: a browser that
 // navigates away must not abort a run halfway through, leaving a device row in
 // 'running' and no evidence. The goroutine gets its own timeout.
-func (s *Service) Start(ctx context.Context, device Device) (int64, error) {
+func (s *Service) Start(ctx context.Context, device Device, triggeredBy string) (int64, error) {
 	if !s.AllowRun {
 		return 0, fmt.Errorf("collection is disabled on this server")
 	}
@@ -268,7 +268,7 @@ func (s *Service) Start(ctx context.Context, device Device) (int64, error) {
 	}
 
 	ing := collector.Ingest{Pool: s.Pool, ParserVersion: "vsol-epon@0.5"}
-	runID, err := ing.StartRun(ctx, device.ID)
+	runID, err := ing.StartRun(ctx, device.ID, triggeredBy)
 	if err != nil {
 		s.unlock(device.ID)
 		return 0, err

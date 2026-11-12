@@ -22,6 +22,7 @@ type RunSummary struct {
 	FinishedAt    *time.Time `json:"finishedAt"`
 	DurationMs    *int64     `json:"durationMs"`
 	ErrorMessage  *string    `json:"errorMessage"`
+	TriggeredBy   *string    `json:"triggeredBy"`
 	EvidenceCount int        `json:"evidenceCount"`
 }
 
@@ -45,7 +46,8 @@ func (s *Store) ListRuns(ctx context.Context, limit int) ([]RunSummary, error) {
 		       r.started_at, r.finished_at, r.error_message,
 		       CASE WHEN r.finished_at IS NULL THEN NULL
 		            ELSE (EXTRACT(EPOCH FROM (r.finished_at - r.started_at)) * 1000)::bigint END,
-		       (SELECT count(*)::int FROM raw_evidence e WHERE e.collection_run_id = r.id)
+		       (SELECT count(*)::int FROM raw_evidence e WHERE e.collection_run_id = r.id),
+		       r.triggered_by
 		  FROM collection_runs r
 		  LEFT JOIN olts o ON o.id = r.olt_id
 		 ORDER BY r.started_at DESC
@@ -59,7 +61,7 @@ func (s *Store) ListRuns(ctx context.Context, limit int) ([]RunSummary, error) {
 	for rows.Next() {
 		var run RunSummary
 		if err := rows.Scan(&run.ID, &run.OltID, &run.OltName, &run.JobType, &run.Result,
-			&run.StartedAt, &run.FinishedAt, &run.ErrorMessage, &run.DurationMs, &run.EvidenceCount); err != nil {
+			&run.StartedAt, &run.FinishedAt, &run.ErrorMessage, &run.DurationMs, &run.EvidenceCount, &run.TriggeredBy); err != nil {
 			return nil, fmt.Errorf("scan run: %w", err)
 		}
 		out = append(out, run)

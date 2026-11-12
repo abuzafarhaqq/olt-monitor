@@ -87,7 +87,8 @@ func (s *Server) collectOlt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	runID, err := s.collector.Start(r.Context(), device)
+	actor, _ := userFrom(r.Context())
+	runID, err := s.collector.Start(r.Context(), device, actor.Username)
 	if err != nil {
 		if errors.Is(err, collecting.ErrAlreadyRunning) {
 			writeError(w, http.StatusConflict, "already_running", err.Error())
