@@ -1,32 +1,33 @@
 import { useEffect, useState } from "react";
 import { DetailDrawer } from "../../components/common/DetailDrawer";
-import {
-  collectNow,
-  getCollectionPlan,
-  type CollectionPlan,
-  type CollectionResult,
-} from "../../services/oltApi";
+import { getCollectionPlan, type CollectionPlan } from "../../services/oltApi";
+import { startCollection, streamRun } from "../../services/liveApi";
 
 interface CollectDrawerProps {
   oltId: string;
   oltName: string;
   onClose: () => void;
-  /** Called after a successful run so the inventory reloads. */
+  /** Called when the run finishes, so the inventory picks up the new timestamp. */
   onDone: () => void;
 }
 
+/** Keep the streamed text bounded; the full transcript is in Logs anyway. */
+const MAX_OUTPUT = 40_000;
+
 /**
- * Refresh confirmation.
+ * Refresh confirmation with a live view of the run.
  *
- * The command list is fetched from the server and shown in full before anything
- * is dialled: this button opens an SSH session to a production OLT, and the
- * operator gets to read exactly what will run.
+ * Collection is asynchronous: the request returns 202 with a run id and the work
+ * happens on the server. This drawer subscribes to that run's SSE stream, so
+ * what you read here is the same bytes the device sent — the full transcript
+ * stays in Logs afterwards.
  */
 export function CollectDrawer({ oltId, oltName, onClose, onDone }: CollectDrawerProps) {
   const [plan, setPlan] = useState<CollectionPlan | null>(null);
+  const [runId, setRunId] = useState<number | null>(null);
+  const [output, setOutput] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<CollectionResult | null>(null);
+  const [state, setState] = useState<"plan" | "running" | "done">("plan");
 
   useEffect(() => {
     let alive = true;
@@ -42,98 +43,108 @@ export function CollectDrawer({ oltId, oltName, onClose, onDone }: CollectDrawer
     };
   }, [oltId]);
 
+  const append = (text: string) =>
+    setOutput((current) => {
+      const next = current + text;
+      return next.length > MAX_OUTPUT ? next.slice(next.length - MAX_OUTPUT) : next;
+    });
+
   const run = async () => {
-    setRunning(true);
+    setState("running");
     setError(null);
+    setOutput("");
+
     try {
-      const collected = await collectNow(oltId);
-      setResult(collected);
-      onDone();
+      const started = await startCollection(oltId);
+      setRunId(started.runId);
+      append(`run #${started.runId} on ${oltName}\n`);
+
+      streamRun(
+        started.runId,
+        (event) => {
+          switch (event.kind) {
+            case "cmd":
+              append(`\n# ${event.data ?? ""}\n`);
+              break;
+            case "out":
+              append(event.data ?? "");
+              break;
+            case "info":
+            case "start":
+              append(`\n· ${event.data ?? ""}\n`);
+              break;
+            case "error":
+              append(`\n! ${event.data ?? ""}\n`);
+              break;
+            case "truncated":
+              append(`\n--- missed ${event.data ?? "some"} events ---\n`);
+              break;
+            case "end":
+              append(`\n■ finished: ${event.data ?? "done"}\n`);
+              setState("done");
+              onDone();
+              break;
+          }
+        },
+        (message) => setError(message),
+      );
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Collection failed");
-    } finally {
-      setRunning(false);
+      setState("plan");
+      setError(caught instanceof Error ? caught.message : "Could not start the run");
     }
   };
 
   return (
     <DetailDrawer
       title={`Refresh ${oltName}`}
-      subtitle="Read-only commands. Nothing is configured or rebooted."
+      subtitle={
+        state === "running"
+          ? `live · run #${runId ?? "…"}`
+          : "Read-only commands. Nothing is configured or rebooted."
+      }
       onClose={onClose}
       footer={
-        result === null ? (
+        state === "plan" ? (
           <>
-            <button type="button" className="btn" onClick={onClose} disabled={running}>
+            <button type="button" className="btn" onClick={onClose}>
               Cancel
             </button>
             <button
               type="button"
               className="btn btn--primary"
               onClick={run}
-              disabled={running || plan === null}
+              disabled={plan === null}
             >
-              {running ? "Collecting… (up to 90s)" : "Run collection"}
+              Run collection
             </button>
           </>
+        ) : state === "running" ? (
+          <button type="button" className="btn" onClick={onClose}>
+            Close (the run continues)
+          </button>
         ) : (
           <button type="button" className="btn btn--primary" onClick={onClose}>
-            Close
+            Done
           </button>
         )
       }
     >
-      {result === null ? (
+      {state === "plan" ? (
         <>
           <p className="cell-sub">
             One SSH session, {plan?.commands.length ?? "…"} commands, then the result is written to
-            the database in a single transaction.
+            the database. The run keeps going if you close this panel.
           </p>
-
           {plan === null ? null : (
-            <pre className="raw__pre" style={{ maxHeight: 320 }}>
+            <pre className="raw__pre" style={{ maxHeight: 300 }}>
               {plan.lines.map((line, index) => `${String(index + 1).padStart(2, " ")}  ${line}`).join("\n")}
             </pre>
           )}
-
-          {running ? (
-            <p className="cell-sub" role="status">
-              Dialling {oltName}. The device answers slowly on optical queries; the request is held
-              open until it finishes.
-            </p>
-          ) : null}
         </>
       ) : (
-        <>
-          <p className="auth-banner" role="status">
-            <strong>Stored.</strong> Run #{result.runId} finished in {Math.round(result.tookMs / 1000)}s.
-            The inventory and ONU pages reload from the database now.
-          </p>
-          <p className="cell-sub">
-            {result.plan.commands.length} commands executed on {oltName}. Raw output is kept as
-            evidence for every one of them.
-          </p>
-
-          <ul className="command-results">
-            {result.results.map((command) => (
-              <li key={command.id} className="command-result">
-                <div className="command-result__head">
-                  <span className={`badge ${command.ok ? "badge--online" : "badge--offline"}`}>
-                    {command.ok ? "ok" : "failed"}
-                  </span>
-                  <code className="mono">{command.line}</code>
-                  <span className="cell-sub">{command.summary ?? command.error ?? ""}</span>
-                </div>
-                {command.raw === undefined || command.raw === "" ? null : (
-                  <details className="command-result__raw">
-                    <summary>output</summary>
-                    <pre className="raw__pre">{command.raw}</pre>
-                  </details>
-                )}
-              </li>
-            ))}
-          </ul>
-        </>
+        <pre className="raw__pre" style={{ maxHeight: 420 }}>
+          {output}
+        </pre>
       )}
 
       {error === null ? null : (

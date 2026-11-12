@@ -355,6 +355,9 @@ func (s *Service) execute(device Device, runID int64, ing collector.Ingest) {
 	})
 	if err != nil {
 		result, reason = "failed", "connect: "+err.Error()
+		_ = ing.RecordDeviceState(context.Background(), device.ID, collector.DeviceState{
+			Reachable: false, CollectionStatus: "failed",
+		}, time.Now().UTC())
 		publish("error", reason)
 		return
 	}
@@ -413,6 +416,21 @@ func (s *Service) execute(device Device, runID int64, ing collector.Ingest) {
 			publish("error", reason)
 		}
 		jobs = append(jobs, job)
+	}
+
+	// What the device said about itself. This is what the inventory shows as
+	// "last collection" — without it the column never moves.
+	state := collector.DeviceState{Reachable: true, CollectionStatus: result, ClockTrusted: true}
+	for _, res := range results {
+		switch parsed := res.Parsed.(type) {
+		case vsol.Version:
+			state.Firmware, state.Hardware = parsed.Software, parsed.Hardware
+		case vsol.Clock:
+			state.ClockTrusted = parsed.Trusted
+		}
+	}
+	if err := ing.RecordDeviceState(ctx, device.ID, state, started); err != nil {
+		publish("error", "device state: "+err.Error())
 	}
 
 	if err := ing.Append(ctx, runID, device.ID, started, jobs); err != nil {

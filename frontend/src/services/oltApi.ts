@@ -82,13 +82,6 @@ export interface CommandResult {
   raw?: string;
 }
 
-export interface CollectionResult {
-  runId: number;
-  plan: CollectionPlan;
-  results: CommandResult[];
-  stored: boolean;
-  tookMs: number;
-}
 
 /** The exact commands a refresh would run — shown before anything is dialled. */
 export async function getCollectionPlan(id: string): Promise<CollectionPlan> {
@@ -96,11 +89,4 @@ export async function getCollectionPlan(id: string): Promise<CollectionPlan> {
     throw new Error("Refresh needs the API (set USE_MOCK_API = false).");
   }
   return request<CollectionPlan>(`/olts/${id}/collection-plan`);
-}
-
-export async function collectNow(id: string): Promise<CollectionResult> {
-  if (USE_MOCK_API) {
-    throw new Error("Refresh needs the API (set USE_MOCK_API = false).");
-  }
-  return request<CollectionResult>(`/olts/${id}/collect`, { method: "POST", timeoutMs: 150_000 });
 }
