@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/config"
 	"log/slog"
 	"os"
 	"time"
@@ -14,6 +15,9 @@ import (
 )
 
 func main() {
+	// Same file app.sh sources, so a CLI does not need a hand-exported DSN.
+	_, _ = config.LoadEnvFile()
+
 	dsn := flag.String("dsn", os.Getenv("DATABASE_URL"), "Postgres connection string")
 	seed := flag.Bool("seed", false, "replace the database contents with the demo fixture")
 	flag.Parse()

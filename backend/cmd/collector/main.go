@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/config"
 	"net"
 	"os"
 	"path/filepath"
@@ -30,6 +31,9 @@ import (
 )
 
 func main() {
+	// Same file app.sh sources, so a CLI does not need a hand-exported DSN.
+	_, _ = config.LoadEnvFile()
+
 	host := flag.String("host", "", "device address (no default: there is none)")
 	port := flag.Int("port", 22, "SSH port")
 	user := flag.String("user", "", "SSH username")

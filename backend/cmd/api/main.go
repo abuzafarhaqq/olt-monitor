@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/config"
 	"log/slog"
 	"net/http"
 	"os"
@@ -39,6 +40,9 @@ func firstNonEmpty(values ...string) string {
 var buildTime = "dev"
 
 func main() {
+	// Same file app.sh sources, so a CLI does not need a hand-exported DSN.
+	_, _ = config.LoadEnvFile()
+
 	addr := flag.String("addr", ":8080", "listen address")
 	dsn := flag.String("dsn", os.Getenv("DATABASE_URL"), "Postgres DSN; empty = in-memory fixture")
 	logLevel := flag.String("log-level", "info", "debug|info|warn|error")

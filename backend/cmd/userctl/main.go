@@ -10,6 +10,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/config"
 	"log/slog"
 	"os"
 	"strings"
@@ -23,6 +24,9 @@ import (
 )
 
 func main() {
+	// Same file app.sh sources, so a CLI does not need a hand-exported DSN.
+	_, _ = config.LoadEnvFile()
+
 	if len(os.Args) < 2 {
 		usage()
 		os.Exit(2)
@@ -30,7 +34,7 @@ func main() {
 
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
-		slog.Error("DATABASE_URL is not set")
+		slog.Error("DATABASE_URL is not set — put it in .secrets/app.env (one KEY=VALUE line) or export it")
 		os.Exit(2)
 	}
 
