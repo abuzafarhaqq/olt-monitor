@@ -391,11 +391,21 @@ curl -sf "http://127.0.0.1:${BACKEND_PORT}/api/v1/health" >/dev/null \
   || { tail -20 "$LOG_DIR/backend.log" >&2; die "the API did not become healthy"; }
 
 step "starting the frontend on :${FRONTEND_PORT}"
-(cd "$ROOT/frontend" && "$(package_manager)" dev --host "$BIND_HOST" --port "$FRONTEND_PORT") >"$LOG_DIR/frontend.log" 2>&1 &
+# Start vite directly when it is installed. Going through `pnpm dev` adds pnpm's
+# own work first — lockfile supply-chain verification, script hooks — which
+# writes to the terminal, ignores the log redirect and can take a minute. The
+# dev server is all this script needs.
+if [ -x "$ROOT/frontend/node_modules/.bin/vite" ]; then
+  (cd "$ROOT/frontend" && exec ./node_modules/.bin/vite --host "$BIND_HOST" --port "$FRONTEND_PORT") \
+    >"$LOG_DIR/frontend.log" 2>&1 &
+else
+  (cd "$ROOT/frontend" && exec "$(package_manager)" dev --host "$BIND_HOST" --port "$FRONTEND_PORT") \
+    >"$LOG_DIR/frontend.log" 2>&1 &
+fi
 PIDS+=($!)
 
 FRONTEND_UP=0
-for _ in $(seq 1 60); do
+for _ in $(seq 1 120); do
   # `cmd && break` as the last statement of a loop body aborts under set -e;
   # the frontend taking a few seconds to boot is normal, not a failure.
   if curl -sf "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null 2>&1; then
