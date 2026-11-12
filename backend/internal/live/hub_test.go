@@ -1,6 +1,7 @@
 package live_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -33,11 +34,11 @@ func TestRingBufferServesLateSubscribers(t *testing.T) {
 func TestRingIsBounded(t *testing.T) {
 	hub := live.NewHub()
 	hub.Open(1)
-	for i := 0; i < live.RingSize+500; i++ {
+	for i := 0; i < live.RingEvents+500; i++ {
 		hub.Publish(1, "out", "x")
 	}
-	if got := len(hub.History(1, 0)); got != live.RingSize {
-		t.Fatalf("history = %d, want the ring size %d", got, live.RingSize)
+	if got := len(hub.History(1, 0)); got != live.RingEvents {
+		t.Fatalf("history = %d, want the ring size %d", got, live.RingEvents)
 	}
 }
 
@@ -98,5 +99,63 @@ func TestSlowSubscriberIsDroppedNotBlocking(t *testing.T) {
 
 	if hub.Dropped(3) == 0 {
 		t.Fatal("expected dropped events for a non-reading subscriber")
+	}
+}
+
+// The ring is bounded in bytes, not events: a run that prints megabytes must not
+// pin them in memory, and the tail is what a terminal needs.
+func TestRingIsByteBounded(t *testing.T) {
+	hub := live.NewHub()
+	hub.Open(9)
+
+	chunk := strings.Repeat("x", 64<<10) // 64 kB per event
+	for i := 0; i < 100; i++ {           // 6.4 MB total, over the 4 MB cap
+		hub.Publish(9, "out", chunk)
+	}
+
+	history := hub.History(9, 0)
+	bytes := 0
+	for _, ev := range history {
+		bytes += len(ev.Data)
+	}
+	if bytes > live.RingBytes+(64<<10) {
+		t.Fatalf("ring holds %d bytes, cap is %d", bytes, live.RingBytes)
+	}
+	// The tail survives; the start does not.
+	last := history[len(history)-1]
+	if last.Seq < 100 {
+		t.Fatalf("newest event is %d, want 100", last.Seq)
+	}
+	if first, _ := hub.FirstSeq(9); first <= 1 {
+		t.Fatalf("first buffered seq = %d, expected the beginning to be evicted", first)
+	}
+}
+
+func TestFinishedRunsAreEvicted(t *testing.T) {
+	hub := live.NewHubWithRetention(30*time.Millisecond, 2)
+
+	for id := int64(1); id <= 5; id++ {
+		hub.Open(id)
+		hub.Publish(id, "out", "x")
+		hub.Close(id, "end", "done")
+	}
+
+	// Count cap: only the two most recent finished runs survive.
+	alive := 0
+	for id := int64(1); id <= 5; id++ {
+		if _, ok := hub.FirstSeq(id); ok {
+			alive++
+		}
+	}
+	if alive > 2 {
+		t.Fatalf("%d runs retained, cap is 2", alive)
+	}
+
+	// TTL: the rest disappear as well.
+	time.Sleep(60 * time.Millisecond)
+	for id := int64(1); id <= 5; id++ {
+		if _, ok := hub.FirstSeq(id); ok {
+			t.Fatalf("run %d outlived its retention", id)
+		}
 	}
 }

@@ -90,6 +90,15 @@ export function DiagnosticsConsolePage() {
             case "error":
               write(`\r\n\x1b[31m! ${event.data ?? ""}\x1b[0m\r\n`);
               break;
+            case "truncated":
+              // Bytes were lost (ring evicted them, or this client fell behind).
+              // Continuing would render a stream split mid-escape-sequence, so
+              // reset and say so.
+              term.reset();
+              write(
+                `\x1b[33m--- missed ${event.data ?? "some"} event(s); view reset ---\x1b[0m\r\n`,
+              );
+              break;
             case "end":
               write(`\r\n\x1b[32m■ run finished: ${event.data ?? "done"}\x1b[0m\r\n`);
               setStatus(event.data === "successful" ? "done" : "error");

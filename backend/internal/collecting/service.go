@@ -354,8 +354,12 @@ func (s *Service) execute(device Device, runID int64, ing collector.Ingest) {
 	defer session.Close()
 
 	// Streaming starts only now: the login sequence is never part of the stream.
-	observer := collector.Tee(collector.NewRedactor(password, cliPass, enablePass),
-		func(kind, data string) { publish(kind, data) })
+	// Output is batched (64 kB / 60 ms) before it reaches the hub; the deferred
+	// Close runs before the run is finished, so the tail is never lost.
+	coalescer := collector.NewCoalescer(func(kind, data string) { publish(kind, data) }, 64<<10, 60*time.Millisecond)
+	defer coalescer.Close()
+
+	observer := collector.Tee(collector.NewRedactor(password, cliPass, enablePass), coalescer.Handle)
 	session.SetObserver(observer)
 	publish("info", "logged in to "+device.Name)
 

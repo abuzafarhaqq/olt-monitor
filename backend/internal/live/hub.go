@@ -1,9 +1,10 @@
 // Package live is the in-memory fan-out for a running collection.
 //
-// One process, one hub: a run's output is broadcast to every subscriber, kept in
-// a ring buffer so a late or reconnecting client can catch up, and dropped for
-// subscribers that stop reading rather than letting one slow browser stall the
-// SSH session.
+// Bounds are in BYTES, not events. A device emits whatever chunk sizes the
+// kernel hands over — 1 KB or 32 KB — so "4000 events" is anywhere between 4 MB
+// and 128 MB of RAM. The ring keeps the tail, because that is what a terminal
+// shows, and it is capped in both dimensions so one pathological run cannot
+// exhaust the process.
 package live
 
 import (
@@ -12,16 +13,24 @@ import (
 	"time"
 )
 
-// RingSize is how much output a late subscriber can recover. A full optical
-// query on four ports is a few hundred lines; 4000 events is generous and bounded.
-const RingSize = 4000
+const (
+	// RingBytes is how much output a late subscriber can recover: the last
+	// 4 MB, which is roughly half a full 25,000-ONU collection.
+	RingBytes = 4 << 20
+	// RingEvents caps the count as well, so a flood of tiny writes cannot make
+	// the ring bookkeeping heavier than the payload.
+	RingEvents = 20000
 
-// SubscriberBuffer bounds a single client. Full buffer = dropped events, never a
-// blocked publisher: the collector must not wait for a browser.
-const SubscriberBuffer = 512
+	// SubscriberBuffer bounds one client in events.
+	SubscriberBuffer = 512
 
-// Event kinds. "out" is raw device bytes, "cmd" is the line that was sent,
-// "end" closes the run, "error" carries a failure.
+	// RetainAfterClose keeps a finished run available for reconnects, then frees
+	// it. Without this the hub is a memory leak with a comment.
+	RetainAfterClose = 10 * time.Minute
+	// MaxRetainedRuns bounds the number of finished runs kept at once.
+	MaxRetainedRuns = 20
+)
+
 type Event struct {
 	Seq  int64     `json:"seq"`
 	Kind string    `json:"kind"`
@@ -30,39 +39,52 @@ type Event struct {
 }
 
 type subscriber struct {
-	ch chan Event
-}
-
-type run struct {
-	mu      sync.Mutex
-	ring    []Event // circular, oldest overwritten
-	head    int     // next write position
-	count   int     // events currently held
-	nextSeq atomic.Int64
-	subs    map[*subscriber]struct{}
-	closed  bool
+	ch      chan Event
 	dropped int
 }
 
-// Hub owns one run state per run id.
+type run struct {
+	mu        sync.Mutex
+	ring      []Event
+	ringBytes int
+	nextSeq   atomic.Int64
+	subs      map[*subscriber]struct{}
+	closed    bool
+	closedAt  time.Time
+	dropped   int
+}
+
 type Hub struct {
 	mu   sync.RWMutex
 	runs map[int64]*run
+	// order is insertion order, used to evict the oldest finished runs first.
+	order []int64
+
+	ttl   time.Duration
+	limit int
 }
 
-func NewHub() *Hub { return &Hub{runs: make(map[int64]*run)} }
+func NewHub() *Hub {
+	return &Hub{runs: make(map[int64]*run), ttl: RetainAfterClose, limit: MaxRetainedRuns}
+}
 
-// Open registers a run before collection starts. Publishing to an unknown run
-// panics in a test but is ignored in production — a late event is not worth a crash.
+// NewHubWithRetention exists for tests: production wants the defaults.
+func NewHubWithRetention(ttl time.Duration, limit int) *Hub {
+	return &Hub{runs: make(map[int64]*run), ttl: ttl, limit: limit}
+}
+
 func (h *Hub) Open(runID int64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if _, exists := h.runs[runID]; !exists {
-		h.runs[runID] = &run{subs: make(map[*subscriber]struct{})}
+	if _, exists := h.runs[runID]; exists {
+		return
 	}
+	h.runs[runID] = &run{subs: make(map[*subscriber]struct{})}
+	h.order = append(h.order, runID)
 }
 
-// Publish appends to the ring and fans out. Non-blocking by design.
+// Publish appends to the ring and fans out. Non-blocking by design: the SSH
+// reader must never wait for a browser.
 func (h *Hub) Publish(runID int64, kind, data string) {
 	h.mu.RLock()
 	r := h.runs[runID]
@@ -73,33 +95,36 @@ func (h *Hub) Publish(runID int64, kind, data string) {
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	if r.closed {
 		return
 	}
 
 	ev := Event{Seq: r.nextSeq.Add(1), Kind: kind, Data: data, At: time.Now().UTC()}
+	r.ring = append(r.ring, ev)
+	r.ringBytes += len(ev.Data) + 64 // rough per-event overhead
 
-	if len(r.ring) < RingSize {
-		r.ring = append(r.ring, ev)
-	} else {
-		r.ring[r.head] = ev
-		r.head = (r.head + 1) % RingSize
+	for (r.ringBytes > RingBytes || len(r.ring) > RingEvents) && len(r.ring) > 1 {
+		dropped := r.ring[0]
+		r.ring = r.ring[1:]
+		r.ringBytes -= len(dropped.Data) + 64
 	}
-	r.count++
 
 	for sub := range r.subs {
 		select {
 		case sub.ch <- ev:
 		default:
-			// Slow subscriber: drop the event for that client only. Closing the
-			// channel here would break the session's view mid-stream.
+			// A client that stops reading is disconnected rather than silently
+			// losing bytes: dropped bytes in the middle of a vt100 escape
+			// sequence render as garbage. It reconnects with Last-Event-ID and
+			// is told exactly how much it missed.
+			sub.dropped++
 			r.dropped++
+			close(sub.ch)
+			delete(r.subs, sub)
 		}
 	}
 }
 
-// Close marks the run finished, sends the final event and detaches subscribers.
 func (h *Hub) Close(runID int64, kind, data string) {
 	if kind != "" {
 		h.Publish(runID, kind, data)
@@ -113,16 +138,56 @@ func (h *Hub) Close(runID int64, kind, data string) {
 	}
 
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.closed = true
+	r.closedAt = time.Now()
 	for sub := range r.subs {
 		close(sub.ch)
 		delete(r.subs, sub)
 	}
+	r.mu.Unlock()
+
+	// Free the run after the retention window, and enforce the count cap now.
+	time.AfterFunc(h.ttl, func() {
+		h.mu.Lock()
+		delete(h.runs, runID)
+		h.mu.Unlock()
+	})
+	h.evictFinished()
 }
 
-// History returns buffered events with Seq > after, oldest first. Used for
-// Last-Event-ID resume and for a client that connects after the run started.
+func (h *Hub) evictFinished() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	finished := 0
+	for _, id := range h.order {
+		if r := h.runs[id]; r != nil {
+			r.mu.Lock()
+			closed := r.closed
+			r.mu.Unlock()
+			if closed {
+				finished++
+			}
+		}
+	}
+
+	for _, id := range h.order {
+		if finished <= h.limit {
+			break
+		}
+		if r := h.runs[id]; r != nil {
+			r.mu.Lock()
+			closed := r.closed
+			r.mu.Unlock()
+			if closed {
+				delete(h.runs, id)
+				finished--
+			}
+		}
+	}
+}
+
+// History returns buffered events with Seq > after, oldest first.
 func (h *Hub) History(runID, after int64) []Event {
 	h.mu.RLock()
 	r := h.runs[runID]
@@ -143,8 +208,23 @@ func (h *Hub) History(runID, after int64) []Event {
 	return out
 }
 
-// Subscribe returns a channel and a cancel function. If the run is already
-// closed the channel is closed immediately — the caller replays History first.
+// FirstSeq reports the oldest event still buffered, so the stream can tell a
+// client that the beginning is gone instead of pretending it has everything.
+func (h *Hub) FirstSeq(runID int64) (int64, bool) {
+	h.mu.RLock()
+	r := h.runs[runID]
+	h.mu.RUnlock()
+	if r == nil {
+		return 0, false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.ring) == 0 {
+		return 0, false
+	}
+	return r.ring[0].Seq, true
+}
+
 func (h *Hub) Subscribe(runID int64) (<-chan Event, func()) {
 	h.mu.RLock()
 	r := h.runs[runID]
@@ -176,7 +256,6 @@ func (h *Hub) Subscribe(runID int64) (<-chan Event, func()) {
 	}
 }
 
-// Dropped reports how many events a run's slow subscribers missed, for the log.
 func (h *Hub) Dropped(runID int64) int {
 	h.mu.RLock()
 	r := h.runs[runID]

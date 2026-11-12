@@ -154,6 +154,13 @@ func (s *Server) runStream(w http.ResponseWriter, r *http.Request) {
 		return true
 	}
 
+	// If the ring has already forgotten what the client is missing, say so
+	// instead of starting mid-table as though nothing were lost.
+	if first, ok := s.hub.FirstSeq(id); ok && first > after+1 {
+		fmt.Fprintf(w, "event: truncated\ndata: {\"kind\":\"truncated\",\"data\":\"%d\"}\n\n", first-after-1)
+		flusher.Flush()
+	}
+
 	for _, ev := range s.hub.History(id, after) {
 		if !write(ev) {
 			return
@@ -169,6 +176,13 @@ func (s *Server) runStream(w http.ResponseWriter, r *http.Request) {
 			return
 		case ev, ok := <-events:
 			if !ok {
+				// The hub closes a subscriber that stops reading, rather than
+				// dropping bytes mid-escape-sequence. Tell the client how much
+				// it missed and let EventSource reconnect with Last-Event-ID.
+				if dropped := s.hub.Dropped(id); dropped > 0 {
+					fmt.Fprintf(w, "event: truncated\ndata: {\"kind\":\"truncated\",\"data\":\"%d\"}\n\n", dropped)
+					flusher.Flush()
+				}
 				return
 			}
 			if !write(ev) {

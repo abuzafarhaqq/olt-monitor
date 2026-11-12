@@ -16,7 +16,7 @@ export async function startCollection(oltId: string): Promise<StartedRun> {
 
 export interface LiveEvent {
   seq: number;
-  kind: "start" | "info" | "cmd" | "out" | "error" | "end";
+  kind: "start" | "info" | "cmd" | "out" | "error" | "end" | "truncated";
   data?: string;
   at: string;
 }
@@ -45,7 +45,7 @@ export function streamRun(
     }
   };
 
-  for (const kind of ["start", "info", "cmd", "out", "error", "end"] as const) {
+  for (const kind of ["start", "info", "cmd", "out", "error", "end", "truncated"] as const) {
     source.addEventListener(kind, handle as EventListener);
   }
 
