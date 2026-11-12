@@ -88,9 +88,18 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   if (!response.ok) {
-    // The body may be JSON with a message, or HTML from a proxy.
+    // The body is either our own {"error":{"code","message"}} envelope or HTML
+    // from a proxy. Showing the raw JSON in a dialog is how "knownhosts: key is
+    // unknown" reached a user wrapped in braces.
     const text = await response.text().catch(() => "");
-    throw new ApiError(text || `HTTP ${response.status} from ${path}`, response.status, "http");
+    let message = text || `HTTP ${response.status} from ${path}`;
+    try {
+      const body = JSON.parse(text) as { error?: { message?: string } };
+      if (body.error?.message) message = body.error.message;
+    } catch {
+      // Not JSON: keep the text, it is the only evidence available.
+    }
+    throw new ApiError(message, response.status, "http");
   }
 
   if (response.status === 204) return undefined as T;

@@ -87,18 +87,24 @@ type Plan struct {
 }
 
 // AdapterFor picks the adapter for a device vendor.
-func AdapterFor(vendor string) (collector.Adapter, string, error) {
-	switch vendor {
-	case "VSOL":
+// AdapterFor resolves an adapter by vendor AND technology.
+//
+// The vendor alone is not enough: a VSOL GPON OLT is not a VSOL EPON OLT, and
+// running the EPON command set against it returns "% Unknown command" at best.
+// An unregistered combination is an error that names the gap, never a guess.
+func AdapterFor(vendor, technology string) (collector.Adapter, string, error) {
+	switch vendor + "/" + technology {
+	case "VSOL/EPON":
 		return vsol.New(), "vsol-epon", nil
 	default:
-		return nil, "", fmt.Errorf("no adapter for vendor %q yet", vendor)
+		return nil, "", fmt.Errorf(
+			"no adapter for %s %s yet — the VSOL EPON adapter is the only one implemented", vendor, technology)
 	}
 }
 
 // BuildPlan answers "what would you run" without touching the device.
 func (s *Service) BuildPlan(device Device) (Plan, error) {
-	adapter, name, err := AdapterFor(device.Vendor)
+	adapter, name, err := AdapterFor(device.Vendor, device.Technology)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -160,7 +166,7 @@ func (s *Service) Run(ctx context.Context, device Device) (Plan, int64, []Comman
 	}
 	defer session.Close()
 
-	adapter, _, err := AdapterFor(device.Vendor)
+	adapter, _, err := AdapterFor(device.Vendor, device.Technology)
 	if err != nil {
 		return plan, 0, nil, err
 	}
@@ -266,7 +272,7 @@ func (s *Service) Start(ctx context.Context, device Device, triggeredBy string) 
 	if s.Secrets == nil {
 		return 0, fmt.Errorf("secret storage is not configured")
 	}
-	if _, _, err := AdapterFor(device.Vendor); err != nil {
+	if _, _, err := AdapterFor(device.Vendor, device.Technology); err != nil {
 		return 0, err
 	}
 	if !s.tryLock(device.ID) {
@@ -385,7 +391,7 @@ func (s *Service) execute(device Device, runID int64, ing collector.Ingest) {
 	session.SetObserver(observer)
 	publish("info", "logged in to "+device.Name)
 
-	adapter, _, _ := AdapterFor(device.Vendor)
+	adapter, _, _ := AdapterFor(device.Vendor, device.Technology)
 	if adapter.RequiresConfigMode() {
 		if _, err := session.Run(ctx, "configure terminal"); err != nil {
 			result, reason = "failed", "config mode: "+err.Error()

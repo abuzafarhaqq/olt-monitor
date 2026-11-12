@@ -19,7 +19,7 @@ import {
 } from "./selectors";
 
 export function PonExplorerPage() {
-  const { data, loading, error } = useOverview();
+  const { data, loading, error, reload } = useOverview();
   // Empty means "not chosen yet": the first PON is picked once data arrives,
   // because at mount there is nothing to pick from.
   const [selectedPonId, setSelectedPonId] = useState<string>("");
@@ -53,6 +53,11 @@ export function PonExplorerPage() {
         title="PON Explorer"
         subtitle="OLT → PON port → ONU. Port names come from each adapter."
         isMock={USE_MOCK_API}
+        actions={
+          <button type="button" className="btn btn--small" onClick={reload} disabled={loading}>
+            Reload
+          </button>
+        }
       />
 
       <div className="explorer">
