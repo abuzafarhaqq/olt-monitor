@@ -70,10 +70,63 @@ if [ "${STOP:-0}" = "1" ]; then
   exit 0
 fi
 
+
+# Writes .secrets/app.env with every variable this project reads, once.
+write_env_template() {
+  mkdir -p "$ROOT/.secrets"; chmod 700 "$ROOT/.secrets"
+  [ -f "$CONFIG_FILE" ] && return 0
+  cat >"$CONFIG_FILE" <<'TEMPLATE'
+# Sourced by app.sh on every start, and by every Go binary in this repo
+# (userctl, migrate, collector, api). Keep it 0600. Never commit it.
+
+# ── Database ────────────────────────────────────────────────────────────
+# Without this the app runs on fixtures and nothing is stored.
+# DATABASE_URL="postgres://oltmon:PASSWORD@127.0.0.1:5432/oltmon?sslmode=disable"
+
+# ── Device credentials (API, collector, and the Refresh button) ─────────
+# Used when no credential is stored in olt_credentials for that device.
+# OLT_USER=admin
+# OLT_PASSWORD=
+# The device asks for a password twice more: at the character-mode login and
+# again for `enable`. Leave blank to reuse OLT_PASSWORD.
+# OLT_CLI_PASSWORD=
+# OLT_ENABLE_PASSWORD=
+
+# ── Collector behaviour ─────────────────────────────────────────────────
+# false = show the command plan but never dial a device.
+# OLT_ALLOW_COLLECT=true
+# Host keys recorded by: userctl … no, by the collector with -accept-key.
+# OLT_KNOWN_HOSTS=.secrets/known_hosts
+
+# ── Ports ───────────────────────────────────────────────────────────────
+# BACKEND_PORT=8090
+# FRONTEND_PORT=5183
+
+# ── Frontend mode ───────────────────────────────────────────────────────
+# Set by app.sh itself; only override if you know why.
+# VITE_USE_MOCK_API=false
+TEMPLATE
+  chmod 600 "$CONFIG_FILE"
+  step "created ${CONFIG_FILE#$ROOT/} — fill in DATABASE_URL and OLT_USER"
+}
+
+# Names only: a value must never reach the terminal or a log.
+report_config() {
+  local names=() name
+  for name in DATABASE_URL OLT_USER OLT_PASSWORD OLT_CLI_PASSWORD OLT_ENABLE_PASSWORD \
+              OLT_ALLOW_COLLECT OLT_KNOWN_HOSTS BACKEND_PORT FRONTEND_PORT; do
+    [ -n "${!name:-}" ] && names+=("$name")
+  done
+  [ ${#names[@]} -eq 0 ] && return 0
+  ok "configured: ${names[*]}"
+}
+
 # --- configuration ------------------------------------------------------
 # .secrets/app.env is the single place for the DSN and the device passwords.
 # 0600, gitignored, sourced here so ./app.sh alone knows how to reach the
 # database. Marked with set -a so every child process inherits it.
+write_env_template
+
 if [ -f "$CONFIG_FILE" ]; then
   chmod 600 "$CONFIG_FILE" 2>/dev/null || true
   set -a
@@ -81,7 +134,11 @@ if [ -f "$CONFIG_FILE" ]; then
   . "$CONFIG_FILE"
   set +a
   step "configuration loaded from ${CONFIG_FILE#$ROOT/}"
+  report_config
 fi
+
+# Exported for the API's Refresh button and the collector, wherever they run from.
+export OLT_KNOWN_HOSTS="${OLT_KNOWN_HOSTS:-$ROOT/.secrets/known_hosts}"
 
 # A configured database means "run against it" — no --db flag needed.
 if [ "${DATABASE_URL:-}" != "" ] && [ "$FORCE_MOCK" != "1" ]; then
@@ -287,29 +344,10 @@ resolve_database() {
     return
   fi
 
-  mkdir -p "$ROOT/.secrets"; chmod 700 "$ROOT/.secrets"
-  if [ ! -f "$CONFIG_FILE" ]; then
-    cat >"$CONFIG_FILE" <<'TEMPLATE'
-# Sourced by app.sh on every start. Keep this file 0600 and never commit it.
-#
-# The database the app should use. Leave commented to run on fixture data.
-# DATABASE_URL="postgres://oltmon:YOUR_PASSWORD@127.0.0.1:5432/oltmon?sslmode=disable"
-#
-# Device passwords for the character-mode CLI and privileged mode. The SSH
-# password itself lives encrypted in olt_credentials, not here.
-# OLT_CLI_PASSWORD=
-# OLT_ENABLE_PASSWORD=
-#
-# Set to "false" to let the Refresh button show the plan but never dial.
-# OLT_ALLOW_COLLECT=true
-TEMPLATE
-    chmod 600 "$CONFIG_FILE"
-    die "no database configured.
+  die "no database configured.
 
-     I created ${CONFIG_FILE#$ROOT/} — fill in DATABASE_URL there (one line),
-     or start Postgres and re-run with --db, or use ./app.sh --mock for fixtures."
-  fi
-  die "no database available: set DATABASE_URL in ${CONFIG_FILE#$ROOT/}, install docker, or install node for PGlite"
+     Put DATABASE_URL in ${CONFIG_FILE#"$ROOT"/} (one line), start Postgres and
+     use --db, or run ./app.sh --mock for fixtures."
 }
 
 # --- lifecycle ------------------------------------------------------------
