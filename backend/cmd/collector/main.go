@@ -28,6 +28,7 @@ import (
 
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/collector"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/collector/vsol"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
 )
 
 func main() {
@@ -45,6 +46,7 @@ func main() {
 	confirm := flag.Bool("confirm", false, "actually connect; without it this prints the plan and exits")
 	acceptKey := flag.Bool("accept-key", false, "trust-on-first-use: record the device key and exit")
 	discover := flag.Bool("discover", false, "ask the CLI with '?' what it supports, print the answers, run nothing")
+	crawl := flag.Bool("crawl", false, "walk the whole CLI tree with '?' and store it in olt_commands; executes nothing")
 	dsn := flag.String("dsn", os.Getenv("DATABASE_URL"), "store this run in Postgres (empty = print only)")
 	oltID := flag.String("olt-id", "", "database id of this OLT, required with -dsn")
 	flag.Parse()
@@ -115,6 +117,63 @@ func main() {
 		exit(1, "connect: %v", err)
 	}
 	defer session.Close()
+
+	if *crawl {
+		if adapter.RequiresConfigMode() {
+			if _, err := session.Run(ctx, "configure terminal"); err != nil {
+				exit(1, "enter configuration mode: %v", err)
+			}
+		}
+
+		crawler := collector.Crawler{
+			ProbeHelp: func(ctx context.Context, path string) (string, error) {
+				// Probe sends the text without CR: nothing is executed.
+				return session.Probe(ctx, path)
+			},
+			MaxDepth: 4,
+			MaxNodes: 400,
+		}
+		nodes, err := crawler.Crawl(ctx)
+		if err != nil {
+			// A partial tree is still worth keeping.
+			fmt.Printf("crawl stopped: %v\n", err)
+		}
+
+		counts := map[collector.CommandKind]int{}
+		discovered := make([]postgres.DiscoveredCommand, 0, len(nodes))
+		for _, node := range nodes {
+			counts[node.Kind]++
+			discovered = append(discovered, postgres.DiscoveredCommand{
+				Path: node.Command(), Help: node.Help, Kind: string(node.Kind), Depth: node.Depth,
+			})
+		}
+
+		fmt.Printf("\ndiscovered %d commands: read %d, action %d, param %d, unknown %d\n",
+			len(nodes), counts[collector.KindRead], counts[collector.KindAction],
+			counts[collector.KindParam], counts[collector.KindUnknown])
+
+		for _, node := range nodes {
+			if node.Kind == collector.KindRead {
+				fmt.Printf("  read  %s\n", node.Command())
+			}
+		}
+
+		if *dsn != "" {
+			if *oltID == "" {
+				exit(2, "-crawl with -dsn needs -olt-id")
+			}
+			st, err := postgres.New(ctx, *dsn)
+			if err != nil {
+				exit(1, "connect to postgres: %v", err)
+			}
+			defer st.Close()
+			if err := st.SaveCommands(ctx, *oltID, adapter.Name(), discovered, time.Now().UTC()); err != nil {
+				exit(1, "store commands: %v", err)
+			}
+			fmt.Printf("stored %d commands for %s\n", len(discovered), *oltID)
+		}
+		return
+	}
 
 	if *discover {
 		// Read-only: each probe ends in '?', which the CLI answers with its
