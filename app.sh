@@ -129,11 +129,27 @@ package_manager() {
 
 ensure_frontend_deps() {
   local pm; pm="$(package_manager)"
-  if [ ! -d "$ROOT/frontend/node_modules" ]; then
-    step "installing frontend dependencies ($pm)"
-    (cd "$ROOT/frontend" && $pm install --silent) || die "frontend install failed"
+  local modules="$ROOT/frontend/node_modules"
+  local lock="$ROOT/frontend/pnpm-lock.yaml"
+
+  # pnpm stamps node_modules/.modules.yaml when it installs; npm uses
+  # .package-lock.json. Comparing times against the lockfile is what catches a
+  # dependency added in a commit you just pulled — "node_modules exists" does
+  # not, which is how @xterm/addon-fit crashed the dev server on first load.
+  local marker="$modules/.modules.yaml"
+  [ -f "$marker" ] || marker="$modules/.package-lock.json"
+  [ -f "$lock" ] || lock="$ROOT/frontend/package-lock.json"
+
+  local stale=0
+  [ -d "$modules" ] || stale=1
+  [ "$stale" = "0" ] && [ -f "$marker" ] && [ -f "$lock" ] && [ "$lock" -nt "$marker" ] && stale=1
+  [ "$stale" = "0" ] && [ -f "$marker" ] && [ "$ROOT/frontend/package.json" -nt "$marker" ] && stale=1
+
+  if [ "$stale" = "1" ]; then
+    step "installing frontend dependencies ($pm) — lockfile or package.json changed"
+    (cd "$ROOT/frontend" && $pm install) || die "frontend install failed"
   fi
-  ok "frontend dependencies present"
+  ok "frontend dependencies match the lockfile"
 }
 
 # A go.work file above the checkout (commonly ~/go.work) makes every go command
