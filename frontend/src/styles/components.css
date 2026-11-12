@@ -1244,3 +1244,14 @@
     font-size: 11px;
   }
 }
+
+/* The terminal needs width: 460px forces a horizontal scroll on device tables. */
+.drawer--wide {
+  width: min(920px, 100vw);
+}
+
+@media (max-width: 640px) {
+  .drawer--wide {
+    width: 100vw;
+  }
+}

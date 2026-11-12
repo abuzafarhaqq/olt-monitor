@@ -24,8 +24,13 @@ export function CollectDrawer({ oltId, oltName, onClose, onDone }: CollectDrawer
   const [plan, setPlan] = useState<CollectionPlan | null>(null);
   const [runId, setRunId] = useState<number | null>(null);
   const termRef = useRef<LiveTerminalHandle | null>(null);
+  const stopRef = useRef<(() => void) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<"plan" | "running" | "done">("plan");
+
+  // Closing the drawer must close the EventSource. Without this every open
+  // leaves a stream running until the collection finishes.
+  useEffect(() => () => stopRef.current?.(), []);
 
   useEffect(() => {
     let alive = true;
@@ -46,6 +51,7 @@ export function CollectDrawer({ oltId, oltName, onClose, onDone }: CollectDrawer
   const run = async () => {
     setState("running");
     setError(null);
+    stopRef.current?.();
     termRef.current?.reset();
 
     try {
@@ -53,7 +59,7 @@ export function CollectDrawer({ oltId, oltName, onClose, onDone }: CollectDrawer
       setRunId(started.runId);
       append(`\x1b[90mrun #${started.runId} on ${oltName}\x1b[0m\r\n`);
 
-      streamRun(
+      stopRef.current = streamRun(
         started.runId,
         (event) => {
           switch (event.kind) {
@@ -77,6 +83,8 @@ export function CollectDrawer({ oltId, oltName, onClose, onDone }: CollectDrawer
             case "end":
               append(`\r\n\x1b[32m■ finished: ${event.data ?? "done"}\x1b[0m\r\n`);
               setState("done");
+              stopRef.current?.();
+              stopRef.current = null;
               onDone();
               break;
           }
@@ -91,6 +99,7 @@ export function CollectDrawer({ oltId, oltName, onClose, onDone }: CollectDrawer
 
   return (
     <DetailDrawer
+      size="wide"
       title={`Refresh ${oltName}`}
       subtitle={
         state === "running"

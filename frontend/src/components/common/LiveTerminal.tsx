@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 
 export interface LiveTerminalHandle {
@@ -37,13 +38,29 @@ export const LiveTerminal = forwardRef<LiveTerminalHandle, LiveTerminalProps>(
         fontSize: 12,
         scrollback: 8000,
         theme: { background: "#0e1a2b", foreground: "#d6e2f0" },
-        cols: 120,
         rows,
       });
+
+      // A fixed column count is wrong in every container: the console page is
+      // full width, the drawer is not, a phone is neither. Fit measures the
+      // element and sets cols/rows to match.
+      const fit = new FitAddon();
+      term.loadAddon(fit);
       term.open(hostRef.current);
       termRef.current = term;
+      fit.fit();
+
+      const observer = new ResizeObserver(() => {
+        try {
+          fit.fit();
+        } catch {
+          // The element can be zero-sized during a drawer transition.
+        }
+      });
+      observer.observe(hostRef.current);
 
       return () => {
+        observer.disconnect();
         term.dispose();
         termRef.current = null;
       };
