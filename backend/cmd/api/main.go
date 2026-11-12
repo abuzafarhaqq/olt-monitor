@@ -34,6 +34,10 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+// buildTime is set by app.sh with -ldflags. Without it, "is the server running
+// the code I just pulled?" is unanswerable from the outside.
+var buildTime = "dev"
+
 func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	dsn := flag.String("dsn", os.Getenv("DATABASE_URL"), "Postgres DSN; empty = in-memory fixture")
@@ -52,7 +56,7 @@ func main() {
 	var handler http.Handler
 	if *dsn == "" {
 		logger.Warn("no DSN given; serving the in-memory fixture without authentication")
-		handler = api.NewServer(memory.New(), logger).Routes()
+		handler = api.NewServer(memory.New(), logger).WithBuild(buildTime).Routes()
 	} else {
 		pg, err := postgres.New(context.Background(), *dsn)
 		if err != nil {
@@ -117,7 +121,7 @@ func main() {
 	defer stop()
 
 	go func() {
-		logger.Info("api listening", "addr", *addr)
+		logger.Info("api listening", "addr", *addr, "build", buildTime)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("listen failed", "error", err)
 			stop()

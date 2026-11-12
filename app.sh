@@ -391,11 +391,12 @@ done
 
 step "building the API"
 mkdir -p "$ROOT/.bin"
-if ! (cd "$ROOT" && go build -o "$ROOT/.bin/api" ./backend/cmd/api); then
+BUILD_STAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+if ! (cd "$ROOT" && go build -ldflags "-X main.buildTime=${BUILD_STAMP}" -o "$ROOT/.bin/api" ./backend/cmd/api); then
   die "the API did not compile"
 fi
 
-step "starting the API on :${BACKEND_PORT}"
+step "starting the API on :${BACKEND_PORT} (build ${BUILD_STAMP})"
 "$ROOT/.bin/api" "${BACKEND_ARGS[@]}" >"$LOG_DIR/backend.log" 2>&1 &
 PIDS+=($!)
 

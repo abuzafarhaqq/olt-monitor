@@ -20,6 +20,7 @@ import (
 )
 
 type Server struct {
+	build     string
 	store     store.Store
 	auth      store.AuthStore
 	audit     store.AuditStore
@@ -183,8 +184,18 @@ func (s *Server) handleStoreError(w http.ResponseWriter, err error) {
 
 // --- handlers -----------------------------------------------------------
 
+// WithBuild reports the binary's build time on /health, so a stale process is
+// visible instead of being mistaken for a bug in the current code.
+func (s *Server) WithBuild(build string) *Server {
+	s.build = build
+	return s
+}
+
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status": "ok",
+		"build":  s.build,
+	})
 }
 
 func (s *Server) overview(w http.ResponseWriter, r *http.Request) {
