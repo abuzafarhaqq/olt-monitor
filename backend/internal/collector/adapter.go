@@ -58,6 +58,9 @@ type Session interface {
 type Runner struct {
 	Adapter Adapter
 	Session Session
+	// Observe receives the outgoing line before it is sent, so the terminal
+	// shows the command before its output arrives.
+	Observe Observer
 	// MaxOutputBytes truncates a runaway response instead of exhausting memory.
 	MaxOutputBytes int
 }
@@ -77,6 +80,10 @@ func (r Runner) Run(ctx context.Context, ids []string) ([]Result, error) {
 			// An id outside the allow-list is a programming error, not a device
 			// problem: refuse the whole batch rather than skipping silently.
 			return results, fmt.Errorf("command %q is not allow-listed for %s", id, r.Adapter.Name())
+		}
+
+		if r.Observe != nil {
+			r.Observe("cmd", command.Line)
 		}
 
 		raw, err := r.Session.Run(ctx, command.Line)

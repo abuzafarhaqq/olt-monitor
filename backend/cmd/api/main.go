@@ -19,6 +19,7 @@ import (
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/api"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/collecting"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/crypto"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/live"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/secrets"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/memory"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store/postgres"
@@ -94,7 +95,9 @@ func main() {
 		if creds != nil {
 			collectSvc.Secrets = creds
 		}
-		server = server.WithCollector(collectSvc).WithLogs(pg)
+		hub := live.NewHub()
+		collectSvc.Hub = hub
+		server = server.WithCollector(collectSvc).WithLogs(pg).WithHub(hub)
 
 		handler = server.Routes()
 	}

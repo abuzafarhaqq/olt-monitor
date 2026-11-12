@@ -267,3 +267,81 @@ func (in *Ingest) Close() {
 		in.Pool.Close()
 	}
 }
+
+// StartRun inserts a run in the 'running' state and returns its id. The API
+// needs the id before the collection finishes, so the row cannot wait for the
+// result.
+func (in Ingest) StartRun(ctx context.Context, oltID string) (int64, error) {
+	var runID int64
+	if err := in.Pool.QueryRow(ctx, `
+		INSERT INTO collection_runs (olt_id, job_type, started_at, result, live)
+		VALUES ($1, 'full', now(), 'running', TRUE)
+		RETURNING id`, oltID).Scan(&runID); err != nil {
+		return 0, fmt.Errorf("start run: %w", err)
+	}
+	return runID, nil
+}
+
+// Append writes evidence and rows into an existing run.
+func (in Ingest) Append(ctx context.Context, runID int64, oltID string, at time.Time, jobs []Job) error {
+	tx, err := in.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	version := in.ParserVersion
+	if version == "" {
+		version = "unknown"
+	}
+
+	for _, job := range jobs {
+		completeness := 1.0
+		if job.Err != nil {
+			completeness = 0
+		}
+		evidenceID := fmt.Sprintf("run%d-%s", runID, job.ResultID)
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO raw_evidence (id, collection_run_id, olt_id, command, captured_at, parser_version, completeness, body)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			ON CONFLICT (id) DO NOTHING`,
+			evidenceID, runID, oltID, job.Line, at, version, completeness, job.Raw); err != nil {
+			return fmt.Errorf("insert evidence: %w", err)
+		}
+		if job.Err != nil || job.Rows == nil {
+			continue
+		}
+
+		switch rows := job.Rows.(type) {
+		case []OnuStatusRow:
+			if err := upsertStatus(ctx, tx, oltID, at, rows); err != nil {
+				return err
+			}
+		case []OnuIdentityRow:
+			if err := upsertIdentity(ctx, tx, oltID, rows); err != nil {
+				return err
+			}
+		case []OpticalReading:
+			if err := insertOptical(ctx, tx, oltID, runID, at, evidenceID, rows); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	return nil
+}
+
+// FinishRun closes a run with its result.
+func (in Ingest) FinishRun(ctx context.Context, runID int64, result, reason string, streamed int) error {
+	if _, err := in.Pool.Exec(ctx, `
+		UPDATE collection_runs
+		   SET finished_at = now(), result = $2::job_result,
+		       error_message = NULLIF($3, ''), streamed_events = $4
+		 WHERE id = $1`, runID, result, reason, streamed); err != nil {
+		return fmt.Errorf("finish run: %w", err)
+	}
+	return nil
+}

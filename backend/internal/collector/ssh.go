@@ -54,6 +54,10 @@ type SSHSession struct {
 	cliPassword    string
 	enablePassword string
 
+	// observe is set only after login completes: the login banner and prompts
+	// are not streamed, so a half-authenticated client never sees them.
+	observe Observer
+
 	mu     sync.Mutex
 	buffer bytes.Buffer
 }
@@ -274,6 +278,16 @@ type lockedWriter struct{ session *SSHSession }
 
 func (w *lockedWriter) Write(p []byte) (int, error) {
 	w.session.mu.Lock()
+	observer := w.session.observe
+	w.session.mu.Unlock()
+
+	// Publish outside the buffer lock: a slow SSE subscriber must never hold up
+	// the reader that is draining the device.
+	if observer != nil && len(p) > 0 {
+		observer("out", string(p))
+	}
+
+	w.session.mu.Lock()
 	defer w.session.mu.Unlock()
 	return w.session.buffer.Write(p)
 }
@@ -418,6 +432,14 @@ func (s *SSHSession) Probe(ctx context.Context, text string) (string, error) {
 	_, _ = s.readUntil(ctx, s.prompt)
 
 	return strings.TrimSpace(output), nil
+}
+
+// SetObserver starts streaming device output. Called after login, so the
+// credentials sequence and its prompts are never part of the stream.
+func (s *SSHSession) SetObserver(o Observer) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.observe = o
 }
 
 func (s *SSHSession) Close() error {

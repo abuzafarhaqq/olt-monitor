@@ -5,7 +5,11 @@ package collecting
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -36,6 +40,11 @@ type Service struct {
 	// AllowRun is the safety switch: false means "report the plan, dial nothing".
 	AllowRun bool
 	Timeout  time.Duration
+
+	Hub Hub
+
+	mu      sync.Mutex
+	running map[string]bool
 }
 
 // Device is what is needed to dial an OLT.
@@ -79,7 +88,7 @@ func AdapterFor(vendor string) (collector.Adapter, string, error) {
 }
 
 // BuildPlan answers "what would you run" without touching the device.
-func (s Service) BuildPlan(device Device) (Plan, error) {
+func (s *Service) BuildPlan(device Device) (Plan, error) {
 	adapter, name, err := AdapterFor(device.Vendor)
 	if err != nil {
 		return Plan{}, err
@@ -104,7 +113,7 @@ func (s Service) BuildPlan(device Device) (Plan, error) {
 }
 
 // Run executes the plan and ingests the result in one transaction.
-func (s Service) Run(ctx context.Context, device Device) (Plan, int64, []CommandResult, error) {
+func (s *Service) Run(ctx context.Context, device Device) (Plan, int64, []CommandResult, error) {
 	plan, err := s.BuildPlan(device)
 	if err != nil {
 		return plan, 0, nil, err
@@ -223,4 +232,189 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// ErrAlreadyRunning is returned when a collection is in flight for that OLT.
+var ErrAlreadyRunning = errors.New("a collection is already running for this device")
+
+// Hub is the fan-out the terminal subscribes to.
+type Hub interface {
+	Open(runID int64)
+	Publish(runID int64, kind, data string)
+	Close(runID int64, kind, data string)
+	Dropped(runID int64) int
+}
+
+// Start kicks off a collection and returns immediately.
+//
+// The request context is deliberately not used for the work: a browser that
+// navigates away must not abort a run halfway through, leaving a device row in
+// 'running' and no evidence. The goroutine gets its own timeout.
+func (s *Service) Start(ctx context.Context, device Device) (int64, error) {
+	if !s.AllowRun {
+		return 0, fmt.Errorf("collection is disabled on this server")
+	}
+	if s.Secrets == nil {
+		return 0, fmt.Errorf("secret storage is not configured")
+	}
+	if _, _, err := AdapterFor(device.Vendor); err != nil {
+		return 0, err
+	}
+	if !s.tryLock(device.ID) {
+		return 0, ErrAlreadyRunning
+	}
+
+	ing := collector.Ingest{Pool: s.Pool, ParserVersion: "vsol-epon@0.5"}
+	runID, err := ing.StartRun(ctx, device.ID)
+	if err != nil {
+		s.unlock(device.ID)
+		return 0, err
+	}
+
+	if s.Hub != nil {
+		s.Hub.Open(runID)
+	}
+	go s.execute(device, runID, ing)
+	return runID, nil
+}
+
+func (s *Service) tryLock(oltID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.running == nil {
+		s.running = map[string]bool{}
+	}
+	if s.running[oltID] {
+		return false
+	}
+	s.running[oltID] = true
+	return true
+}
+
+func (s *Service) unlock(oltID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.running, oltID)
+}
+
+// execute is the background half. It owns its context, closes the run and
+// releases the lock whatever happens.
+func (s *Service) execute(device Device, runID int64, ing collector.Ingest) {
+	defer s.unlock(device.ID)
+
+	timeout := s.Timeout
+	if timeout == 0 {
+		timeout = 2 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	result, reason := "successful", ""
+	events := 0
+	publish := func(kind, data string) {
+		if s.Hub != nil {
+			s.Hub.Publish(runID, kind, data)
+			events++
+		}
+	}
+	publish("start", device.Name)
+
+	defer func() {
+		if s.Hub != nil {
+			s.Hub.Close(runID, "end", result)
+			if dropped := s.Hub.Dropped(runID); dropped > 0 {
+				reason = strings.TrimSpace(reason + " (stream dropped " + strconv.Itoa(dropped) + " events)")
+			}
+		}
+		if err := ing.FinishRun(context.Background(), runID, result, reason, events); err != nil {
+			s.log("finish run failed", err)
+		}
+	}()
+
+	username, password, err := s.Secrets.Resolve(ctx, device.ID)
+	if err != nil {
+		result, reason = "failed", "credential: "+err.Error()
+		publish("error", reason)
+		return
+	}
+
+	cliPass := firstNonEmpty(s.CLIPass, password)
+	enablePass := firstNonEmpty(s.EnablePass, password)
+
+	session, err := collector.DialSSH(ctx, collector.SSHConfig{
+		Host: device.ManagementAddress, Port: device.ManagementPort, User: username,
+		Password: password, CLIUser: username, CLIPassword: cliPass, EnablePassword: enablePass,
+		Timeout: 20 * time.Second, KnownHosts: s.KnownHosts,
+	})
+	if err != nil {
+		result, reason = "failed", "connect: "+err.Error()
+		publish("error", reason)
+		return
+	}
+	defer session.Close()
+
+	// Streaming starts only now: the login sequence is never part of the stream.
+	observer := collector.Tee(collector.NewRedactor(password, cliPass, enablePass),
+		func(kind, data string) { publish(kind, data) })
+	session.SetObserver(observer)
+	publish("info", "logged in to "+device.Name)
+
+	adapter, _, _ := AdapterFor(device.Vendor)
+	if adapter.RequiresConfigMode() {
+		if _, err := session.Run(ctx, "configure terminal"); err != nil {
+			result, reason = "failed", "config mode: "+err.Error()
+			publish("error", reason)
+			return
+		}
+		publish("info", "configuration mode")
+	}
+
+	plan, err := s.BuildPlan(device)
+	if err != nil {
+		result, reason = "failed", err.Error()
+		publish("error", reason)
+		return
+	}
+
+	runner := collector.Runner{Adapter: adapter, Session: session, Observe: observer}
+	started := time.Now().UTC()
+	results, err := runner.Run(ctx, plan.Commands)
+	if err != nil {
+		result, reason = "failed", err.Error()
+		publish("error", reason)
+		return
+	}
+
+	jobs := make([]collector.Job, 0, len(results))
+	for _, res := range results {
+		job := collector.Job{ResultID: res.CommandID, Line: res.Line, Raw: res.Raw, Err: res.Err}
+		switch rows := res.Parsed.(type) {
+		case []vsol.OnuRow:
+			job.Rows = vsol.ToStatusRows(rows)
+		case []vsol.OnuIdentity:
+			job.Rows = vsol.ToIdentityRows(rows)
+		case []vsol.OpticalRow:
+			job.Rows = vsol.ToOpticalRows(rows)
+		}
+		if res.Err != nil {
+			result = "partial"
+			reason = res.CommandID + ": " + res.Err.Error()
+			publish("error", reason)
+		}
+		jobs = append(jobs, job)
+	}
+
+	if err := ing.Append(ctx, runID, device.ID, started, jobs); err != nil {
+		result, reason = "failed", "store: "+err.Error()
+		publish("error", reason)
+		return
+	}
+	publish("info", "stored — "+result)
+}
+
+func (s *Service) log(msg string, err error) {
+	// The service has no logger by design; the API logs the run outcome from
+	// the row it can read back.
+	_ = msg
+	_ = err
 }

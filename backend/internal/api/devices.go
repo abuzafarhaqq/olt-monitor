@@ -26,6 +26,19 @@ func (s *Server) WithSecrets(service *secrets.Service) *Server {
 	return s
 }
 
+// guardRead protects a read route when authentication is configured.
+//
+// The in-memory fixture has no users, so demanding a session there would make
+// `go run ./cmd/api` useless. Everywhere else — Postgres, real ONU data — these
+// routes carry MACs, serials and raw evidence and must not be readable
+// anonymously.
+func (s *Server) guardRead(next http.HandlerFunc) http.HandlerFunc {
+	if s.auth == nil {
+		return next
+	}
+	return s.guard(auth.PermDeviceRead, next)
+}
+
 // guard is requireSession plus a permission check. The browser hides controls;
 // this is the enforcement.
 func (s *Server) guard(permission auth.Permission, next http.HandlerFunc) http.HandlerFunc {

@@ -1223,3 +1223,24 @@
   max-height: 260px;
   margin-top: var(--space-2);
 }
+
+/* Live terminal ---------------------------------------------------------- */
+
+.terminal-host {
+  background: #0e1a2b;
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  overflow: auto;
+  min-height: 340px;
+}
+
+.terminal-host .xterm {
+  height: 100%;
+}
+
+@media (max-width: 640px) {
+  .terminal-host {
+    padding: 0;
+    font-size: 11px;
+  }
+}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/auth"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/collecting"
+	"github.com/abuzafarhaqq/olt-monitor/backend/internal/live"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/secrets"
 	"github.com/abuzafarhaqq/olt-monitor/backend/internal/store"
 )
@@ -25,6 +26,7 @@ type Server struct {
 	devices   store.DeviceStore
 	users     store.UserStore
 	collector *collecting.Service
+	hub       *live.Hub
 	logs      LogStore
 	secrets   *secrets.Service
 	log       *slog.Logger
@@ -48,17 +50,17 @@ func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/v1/health", s.health)
-	mux.HandleFunc("GET /api/v1/dashboard/overview", s.overview)
-	mux.HandleFunc("GET /api/v1/olts", s.olts)
-	mux.HandleFunc("GET /api/v1/olts/{id}", s.olt)
-	mux.HandleFunc("GET /api/v1/olts/{id}/pons", s.pons)
-	mux.HandleFunc("GET /api/v1/pons/{id}/onus", s.onus)
-	mux.HandleFunc("GET /api/v1/onus/{id}", s.onu)
-	mux.HandleFunc("GET /api/v1/onus/{id}/optical", s.opticalHistory)
-	mux.HandleFunc("GET /api/v1/events", s.events)
-	mux.HandleFunc("GET /api/v1/incidents", s.incidents)
-	mux.HandleFunc("GET /api/v1/incidents/{id}", s.incident)
-	mux.HandleFunc("GET /api/v1/collection/jobs", s.collectionJobs)
+	mux.HandleFunc("GET /api/v1/dashboard/overview", s.guardRead(s.overview))
+	mux.HandleFunc("GET /api/v1/olts", s.guardRead(s.olts))
+	mux.HandleFunc("GET /api/v1/olts/{id}", s.guardRead(s.olt))
+	mux.HandleFunc("GET /api/v1/olts/{id}/pons", s.guardRead(s.pons))
+	mux.HandleFunc("GET /api/v1/pons/{id}/onus", s.guardRead(s.onus))
+	mux.HandleFunc("GET /api/v1/onus/{id}", s.guardRead(s.onu))
+	mux.HandleFunc("GET /api/v1/onus/{id}/optical", s.guardRead(s.opticalHistory))
+	mux.HandleFunc("GET /api/v1/events", s.guardRead(s.events))
+	mux.HandleFunc("GET /api/v1/incidents", s.guardRead(s.incidents))
+	mux.HandleFunc("GET /api/v1/incidents/{id}", s.guardRead(s.incident))
+	mux.HandleFunc("GET /api/v1/collection/jobs", s.guardRead(s.collectionJobs))
 	mux.HandleFunc("GET /api/v1/stream", s.stream)
 
 	mux.HandleFunc("POST /api/v1/auth/login", s.login)
@@ -79,6 +81,7 @@ func (s *Server) Routes() http.Handler {
 	// diagnostics, running it needs the run permission.
 	mux.HandleFunc("GET /api/v1/olts/{id}/collection-plan", s.guard(auth.PermDiagnosticsRead, s.collectionPlan))
 	mux.HandleFunc("POST /api/v1/olts/{id}/collect", s.guard(auth.PermDiagnosticsRun, s.collectOlt))
+	mux.HandleFunc("GET /api/v1/collection/runs/{id}/stream", s.guard(auth.PermDiagnosticsRead, s.runStream))
 
 	mux.HandleFunc("GET /api/v1/collection/runs", s.guard(auth.PermDiagnosticsRead, s.listRuns))
 	mux.HandleFunc("GET /api/v1/collection/runs/{id}", s.guard(auth.PermDiagnosticsRead, s.runDetail))
