@@ -35,7 +35,7 @@ FORCE_PGLITE=0
 FORCE_MOCK=0
 LAN=0
 BIND_HOST="127.0.0.1"
-CONFIG_FILE="$ROOT/.secrets/app.env"
+CONFIG_FILE="${APP_ENV_FILE:-$ROOT/.secrets/app.env}"
 
 for arg in "$@"; do
   case "$arg" in
@@ -273,60 +273,29 @@ resolve_database() {
   if [ "$FORCE_PGLITE" != "1" ] && [ -n "${DATABASE_URL:-}" ]; then
     step "checking DATABASE_URL"
     if ! db_ready "$DATABASE_URL"; then
-      die "DATABASE_URL is set but nothing answers there:
+      die "DATABASE_URL points at a database that is not answering:
        ${DATABASE_URL}
+     set in: ${CONFIG_FILE}
 
      pick one:
-       • start that database (pg_ctlcluster, docker, brew services…)
-       • unset DATABASE_URL      → this script starts PGlite instead
-       • ./app.sh --db --pglite  → ignore DATABASE_URL for this run"
+       • start that Postgres, then re-run
+       • edit that file with the right host/port/password
+       • ./app.sh --db --pglite   → ignore it and use a throwaway Postgres in WASM"
     fi
     DSN_MODE="external"
     return
   fi
 
-  # A Postgres that is already listening beats starting anything. Falling
-  # through to PGlite here would look exactly like data loss: the app would come
-  # up with an empty database while the real one sits on 5432.
-  if command -v pg_isready >/dev/null 2>&1 && pg_isready -h 127.0.0.1 -p 5432 >/dev/null 2>&1; then
-    die "a Postgres is already accepting connections on 127.0.0.1:5432.
+  if [ "$FORCE_PGLITE" != "1" ]; then
+    die "no DATABASE_URL configured.
 
-     Point the script at it instead of starting another:
-       export DATABASE_URL=\"postgres://oltmon:<password>@127.0.0.1:5432/oltmon?sslmode=disable\"
-       ./app.sh --db
-     (add that export to ~/.bashrc so it survives a new shell)"
-  fi
-
-  # Docker only when the compose plugin actually exists. The CLI alone is common
-  # on Termux and \"docker compose\" then fails with a flag error.
-  if have docker && [ -f "$ROOT/db/docker-compose.yml" ]; then
-    if (cd "$ROOT/db" && docker compose version >/dev/null 2>&1); then
-      step "starting Postgres with docker compose"
-      (cd "$ROOT/db" && docker compose up -d) || die "docker compose failed"
-      DATABASE_URL="postgres://oltmon:oltmon@localhost:5432/oltmon?sslmode=disable"
-      for _ in $(seq 1 30); do
-        db_ready "$DATABASE_URL" && break
-        sleep 1
-      done
-      DSN_MODE="docker"
-      return
-    fi
-    if command -v docker-compose >/dev/null 2>&1; then
-      step "starting Postgres with docker-compose"
-      (cd "$ROOT/db" && docker-compose up -d) || die "docker-compose failed"
-      DATABASE_URL="postgres://oltmon:oltmon@localhost:5432/oltmon?sslmode=disable"
-      for _ in $(seq 1 30); do
-        db_ready "$DATABASE_URL" && break
-        sleep 1
-      done
-      DSN_MODE="docker-compose"
-      return
-    fi
-    warn "docker is installed but the compose plugin is not — skipping it"
+     put one line in ${CONFIG_FILE}:
+       DATABASE_URL=\"postgres://oltmon:PASSWORD@127.0.0.1:5432/oltmon?sslmode=disable\"
+     …or run ./app.sh --db --pglite for a throwaway database that keeps nothing."
   fi
 
   if have node; then
-    step "no external database — starting PGlite (PostgreSQL in WASM)"
+    step "--pglite: starting PostgreSQL in WASM (nothing is kept)"
     local port=$((5600 + RANDOM % 300))
     if [ ! -d "$ROOT/tools/pglite/node_modules" ]; then
       (cd "$ROOT/tools/pglite" && "$(package_manager)" install --silent) || die "could not install PGlite"

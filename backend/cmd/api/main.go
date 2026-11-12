@@ -69,7 +69,7 @@ func main() {
 		}
 		defer pg.Close()
 		logger.Info("connected to postgres")
-		server := api.NewServer(pg, logger).WithAuth(pg).WithAudit(pg).WithDevices(pg).WithUsers(pg)
+		server := api.NewServer(pg, logger).WithBuild(buildTime).WithAuth(pg).WithAudit(pg).WithDevices(pg).WithUsers(pg)
 
 		var creds *secrets.Service
 
