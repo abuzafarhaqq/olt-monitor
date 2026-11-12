@@ -69,7 +69,13 @@ export const LiveTerminal = forwardRef<LiveTerminalHandle, LiveTerminalProps>(
     useImperativeHandle(
       ref,
       () => ({
-        write: (text: string) => termRef.current?.write(text),
+        write: (text: string) => {
+          termRef.current?.write(text);
+          // xterm's touch scrolling is weak (xtermjs#5377). Pinning the view to
+          // the newest line means the operator never has to fight the gesture
+          // to see what just arrived.
+          termRef.current?.scrollToBottom();
+        },
         reset: () => termRef.current?.reset(),
       }),
       [],

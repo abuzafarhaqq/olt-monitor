@@ -1255,3 +1255,57 @@
     width: 100vw;
   }
 }
+
+/* ---- Phone: every drawer becomes a full-screen sheet -------------------
+ *
+ * Material's full-screen sheet, which is what a terminal has to be on a phone:
+ * a 460 px panel with a scroller inside a scroller is unusable, and xterm's
+ * touch gestures are weak (xtermjs#5377). Full height, edge to edge, with the
+ * safe-area inset respected so the footer is not under the home indicator.
+ */
+@media (max-width: 640px) {
+  .drawer,
+  .drawer--wide {
+    width: 100vw;
+    height: 100dvh;
+    border-left: 0;
+    border-radius: 0;
+  }
+
+  .drawer__header {
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top));
+  }
+
+  .drawer__footer {
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  }
+
+  /* A terminal drawer gives its whole body to the terminal. */
+  .drawer--wide .drawer__body {
+    padding: var(--space-2);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .drawer--wide .terminal-host {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+
+  /* Touch targets: 44 px minimum, per every platform guideline. */
+  .drawer__footer .btn,
+  .drawer__close {
+    min-height: 44px;
+  }
+
+  .drawer__close {
+    width: 44px;
+  }
+}
+
+/* Desktop keeps the sheet look but caps the height so it never runs off. */
+.drawer--wide .terminal-host {
+  max-height: calc(100dvh - 260px);
+}
