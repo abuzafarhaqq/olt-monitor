@@ -7,6 +7,8 @@
 #   ./app.sh --db --seed     ... and replace its contents with the demo fixture
 #   ./app.sh --install       install dependencies, then exit
 #   ./app.sh --lan           listen on 0.0.0.0 so other machines can reach it
+#   ./app.sh --backend 8090 --frontend 5731 --lan
+#                            choose the ports (same as BACKEND_PORT=… FRONTEND_PORT=…)
 #   ./app.sh --stop          kill this app's processes that this shell can see
 #   ./app.sh --mock          ignore any configured database
 #   ./app.sh --pglite        ignore DATABASE_URL and use PGlite anyway
@@ -40,20 +42,33 @@ LAN=0
 BIND_HOST="127.0.0.1"
 CONFIG_FILE="${APP_ENV_FILE:-$ROOT/.secrets/app.env}"
 
-for arg in "$@"; do
-  case "$arg" in
-    --db) WANT_DB=1 ;;
-    --seed) WANT_SEED=1 ;;
-    --install) WANT_INSTALL_ONLY=1 ;;
-    --mock) FORCE_MOCK=1 ;;
-    --lan) LAN=1 ;;
-    --stop) STOP=1 ;;
-    --pglite) FORCE_PGLITE=1 ;;
-    --no-install) ALLOW_INSTALL=0 ;;
-    -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) echo "unknown argument: $arg" >&2; exit 2 ;;
+# Ports can be given as --backend 8090 / --frontend 5731, or as
+# --backend=8090. The flags win over the environment and over .secrets/app.env.
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --db) WANT_DB=1; shift ;;
+    --seed) WANT_SEED=1; shift ;;
+    --install) WANT_INSTALL_ONLY=1; shift ;;
+    --mock) FORCE_MOCK=1; shift ;;
+    --lan) LAN=1; shift ;;
+    --stop) STOP=1; shift ;;
+    --pglite) FORCE_PGLITE=1; shift ;;
+    --no-install) ALLOW_INSTALL=0; shift ;;
+    --backend|--api-port)
+      [ $# -ge 2 ] || { echo "--backend needs a port number" >&2; exit 2; }
+      BACKEND_PORT="$2"; shift 2 ;;
+    --frontend|--ui-port)
+      [ $# -ge 2 ] || { echo "--frontend needs a port number" >&2; exit 2; }
+      FRONTEND_PORT="$2"; shift 2 ;;
+    --backend=*) BACKEND_PORT="${1#*=}"; shift ;;
+    --frontend=*) FRONTEND_PORT="${1#*=}"; shift ;;
+    -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+
+case "$BACKEND_PORT" in ''|*[!0-9]*) echo "--backend must be a number, got '$BACKEND_PORT'" >&2; exit 2 ;; esac
+case "$FRONTEND_PORT" in ''|*[!0-9]*) echo "--frontend must be a number, got '$FRONTEND_PORT'" >&2; exit 2 ;; esac
 
 # --- output ---------------------------------------------------------------
 step() { printf '\033[1;34m▸\033[0m %s\n' "$*"; }
@@ -400,6 +415,13 @@ for port in "$BACKEND_PORT" "$FRONTEND_PORT"; do
 done
 
 step "building the API"
+# A go command against a path that does not exist prints "go: no go files
+# listed", which says nothing about why. Say what is actually wrong instead.
+for dir in backend/cmd/api backend/cmd/migrate; do
+  if [ ! -d "$ROOT/$dir" ]; then
+    die "expected $dir under $ROOT — this script must sit in the repository root"
+  fi
+done
 mkdir -p "$ROOT/.bin"
 BUILD_STAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 if ! (cd "$ROOT" && go build -ldflags "-X main.buildTime=${BUILD_STAMP}" -o "$ROOT/.bin/api" ./backend/cmd/api); then
@@ -474,7 +496,7 @@ cat <<INFO
 
   ┌─────────────┬──────────────────────────────────────────────┐
   │ database    │ ${DB_STATE}
-  │ api         │ http://127.0.0.1:${BACKEND_PORT}/api/v1/health
+  │ api         │ http://127.0.0.1:${BACKEND_PORT}/api/v1/health  (proxy target)
   │ frontend    │ http://127.0.0.1:${FRONTEND_PORT}$( [ -n "$LAN_IP" ] && printf '\n  │ from LAN    │ http://%s:%s' "$LAN_IP" "$FRONTEND_PORT" )
   │ logs        │ ${LOG_DIR}
   └─────────────┴──────────────────────────────────────────────┘
